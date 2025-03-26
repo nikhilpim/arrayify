@@ -1,0 +1,9 @@
+(test
+ (name test_translator)
+  (libraries llvm)
+ )
+
+(test
+ (name test_parser)
+ (libraries translator llvm llvm.irreader)
+ )

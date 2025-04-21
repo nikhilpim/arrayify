@@ -1,0 +1,6 @@
+(library 
+ (public_name srkmin)
+ (name srkmin)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
+ (libraries core llvm llvm.irreader ocamlgraph batteries zarith ppx_deriving ppx_deriving.show ppx_deriving.ord ppx_deriving.eq z3 memo)
+ )

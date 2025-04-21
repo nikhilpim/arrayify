@@ -1,8 +1,6 @@
 open Symbolicheap
 open Variable
 
-type boogie_graph_node = int
-
 type boogie_term = 
   Int of int
   | Var of boogie_var
@@ -21,13 +19,26 @@ type boogie_formula =
   | Or of boogie_formula * boogie_formula
   | Not of boogie_formula
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula
+type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
 
-type boogie_graph = 
-  { entry : boogie_graph_node
-  ; nodes : (boogie_graph_node * boogie_instr list) list
-  ; edges : (boogie_graph_node * boogie_graph_node) list
-  }
+module BGNode = struct 
+  type t = Llvmutil.LlvmNode.t * symbolicheap
+  let hash = Hashtbl.hash 
+
+  let compare (a, b) (c, d) = if a < c then -1 else if a > c then 1 else 
+                                    Int.compare ( Hashtbl.hash b ) (Hashtbl.hash d)
+  let equal (node1, sheap1) (node2, sheap2) = Llvmutil.LlvmNode.equal node1 node2 && sheap_equals Global.ctx sheap1 sheap2
+end
+
+module BGEdge = struct
+  type t = boogie_instr list 
+  let hash = Hashtbl.hash
+  let compare a b = if hash a < hash b then -1 else if hash a > hash b then 1 else 0 
+  let equal a b = (hash a = hash b)
+  let default = []
+end
+
+module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
 
 
 let rec boogie_term_of_pointer_term (p : pointer_term) = 
@@ -43,5 +54,6 @@ and boogie_term_of_int_term (t: int_term) =
   | Offset p -> boogie_term_of_pointer_term p
   | PSub (p1, p2) -> Sum (boogie_term_of_pointer_term p1, (Times (-1, boogie_term_of_pointer_term p2)))
   
-let code_of_boogie_graph = 
+
+let code_of_boogie_graph _g = 
   raise (Failure "Not implemented")

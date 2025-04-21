@@ -1,5 +1,6 @@
 (library 
- (public_name translator)
- (name translator)
- (libraries llvm llvm.irreader)
+ (public_name arrayify)
+ (name arrayify)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
+ (libraries srkmin core llvm llvm.irreader ocamlgraph batteries zarith ppx_deriving ppx_deriving.show ppx_deriving.ord ppx_deriving.eq z3 memo)
  )

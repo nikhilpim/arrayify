@@ -1,8 +1,6 @@
 open Symbolicheap
 open Variable
 
-type boogie_graph_node
-
 type boogie_term = 
   Int of int
   | Var of boogie_var
@@ -21,15 +19,22 @@ type boogie_formula =
   | Or of boogie_formula * boogie_formula
   | Not of boogie_formula
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula
+type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
 
-type boogie_graph = 
-  { entry : boogie_graph_node
-  ; nodes : (boogie_graph_node * boogie_instr list) list
-  ; edges : (boogie_graph_node * boogie_graph_node) list
-  }
+module BGNode : sig
+  type t = Llvmutil.LlvmNode.t * symbolicheap
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val hash : t -> int
+end
+module BGEdge : sig
+  type t = boogie_instr list 
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val default : t
+end
 
 val boogie_term_of_int_term : int_term -> boogie_term 
 val boogie_term_of_pointer_term : pointer_term -> boogie_term
 
-val code_of_boogie_graph : boogie_graph -> string
+val code_of_boogie_graph : Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> string

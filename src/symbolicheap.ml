@@ -64,7 +64,8 @@ and pointer_term_to_offsetsyntaxterm srk p =
 
 let empty_sheap = True, Heap.empty
 
-let sheap_equals srk (f1, h1) (f2, h2) = Heap.equal h1 h2 && (f1 = f2 || (
+let sheap_equals (f1, h1) (f2, h2) = Heap.equal h1 h2 && (f1 = f2 || (
+    let srk = Global.srk in
     let solver = Global.solver in 
     let s1 = formula_to_syntaxformula srk f1 in
     let s2 = formula_to_syntaxformula srk f2 in
@@ -72,6 +73,31 @@ let sheap_equals srk (f1, h1) (f2, h2) = Heap.equal h1 h2 && (f1 = f2 || (
     let result = check solver in 
     match result with 
     | `Sat -> false
-    | `Unsat -> true
+    | `Unsat -> (
+      reset solver; add solver [s2; Syntax.mk_not srk s1];
+      let result = check solver in 
+      match result with 
+      | `Sat -> false
+      | `Unsat -> true
+      | `Unknown -> raise (Failure "Unknown equivalence from Z3")
+      )
     | `Unknown -> raise (Failure "Unknown equivalence from Z3")
 ))
+
+let sheap_single_b (f, h : symbolicheap) (p : pvar) : bvar option = 
+  let s = formula_to_syntaxformula Global.srk f in 
+  match Heap.find_first_opt (fun e -> 
+    match e with 
+    | Array b -> (
+      let b = Variable.bvar_to_svar Global.srk b in 
+      let p = Variable.pvarblock_to_svar Global.srk p in 
+      let eq = Syntax.mk_eq Global.srk b p in
+      reset Global.solver; add Global.solver [s; Syntax.mk_not Global.srk eq];
+      match check Global.solver with 
+      | `Sat -> false
+      | `Unsat -> true
+      | `Unknown -> raise (Failure "Unknown equivalence from Z3"))
+    | _ -> false
+    ) h with 
+  | Some (Array b) -> Some b
+  | _ -> None

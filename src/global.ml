@@ -1,3 +1,3 @@
 module Ctx = Srkmin.Syntax.MakeContext ()
-let ctx = Ctx.context
-let solver = Srkmin.SrkZ3.Solver.make ctx
+let srk = Ctx.context
+let solver = Srkmin.SrkZ3.Solver.make srk

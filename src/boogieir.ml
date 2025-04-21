@@ -22,12 +22,12 @@ type boogie_formula =
 type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
 
 module BGNode = struct 
-  type t = Llvmutil.LlvmNode.t * symbolicheap
+  type t = int * Llvmutil.LlvmNode.t * symbolicheap
   let hash = Hashtbl.hash 
 
-  let compare (a, b) (c, d) = if a < c then -1 else if a > c then 1 else 
-                                    Int.compare ( Hashtbl.hash b ) (Hashtbl.hash d)
-  let equal (node1, sheap1) (node2, sheap2) = Llvmutil.LlvmNode.equal node1 node2 && sheap_equals Global.ctx sheap1 sheap2
+  let compare (a, b, _) (c, d, _) = if b < d then -1 else if b > d then 1 else if a < c then -1 else if a > c then 1 else 0
+
+  let equal (a, b, _) (c, d, _) = (b = d) && (a = c)
 end
 
 module BGEdge = struct

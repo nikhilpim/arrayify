@@ -22,7 +22,7 @@ type boogie_formula =
 type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
 
 module BGNode : sig
-  type t = Llvmutil.LlvmNode.t * symbolicheap
+  type t = int * Llvmutil.LlvmNode.t * symbolicheap
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int

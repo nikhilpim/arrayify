@@ -112,23 +112,24 @@ let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolich
   (* For now, widening points will be computed via backedges *) 
    let rec go worklist bgraph = 
     if worklist = [] then bgraph else (
-      let (node, precondition) = List.hd worklist in 
+      let (repeat_ct, node, precondition) = List.hd worklist in 
       let worklist = List.tl worklist in
       let worklist, bgraph = LlvmGraph.fold_succ_e (fun (src, weight, tgt) (worklist, bgraph) -> 
             let postcondition, boogie_instrs = symbolic_update (weight) precondition in 
+            let post_repeat = BGraph.fold_vertex (fun (r, l, _) m -> if LlvmNode.equal l tgt then max m (r + 1) else m) bgraph (0) in 
             if (LlvmNode.compare src tgt < 0) then 
               let widened_postcondition = widen postcondition in
-              match BGraph.fold_vertex (fun node find -> match find with Some _ -> find | None -> check_rotate_entails (tgt, widened_postcondition) node) bgraph None with 
+              match BGraph.fold_vertex (fun node find -> match find with Some _ -> find | None -> check_rotate_entails (post_repeat, tgt, widened_postcondition) node) bgraph None with 
               | None -> 
-                let bgraph = BGraph.add_edge_e bgraph ((node, precondition), boogie_instrs, (tgt, widened_postcondition)) in 
-                (tgt, widened_postcondition) :: worklist, bgraph
+                let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs, (post_repeat, tgt, widened_postcondition)) in 
+                (post_repeat, tgt, widened_postcondition) :: worklist, bgraph
               | Some (repeat, rotation) ->
-                let bgraph = BGraph.add_edge_e bgraph ((node, precondition), boogie_instrs @ rotation, repeat) in
+                let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs @ rotation, repeat) in
                 worklist, bgraph
             else (
-            let bgraph = BGraph.add_edge_e bgraph ((node, precondition), boogie_instrs, (tgt, postcondition)) in 
-            (tgt, postcondition) :: worklist, bgraph)
+            let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs, (post_repeat, tgt, postcondition)) in 
+            (post_repeat, tgt, postcondition) :: worklist, bgraph)
            ) graph node (worklist, bgraph) in 
       go worklist bgraph )
   in 
-  go [entry, precondition] BGraph.empty
+  go [0, entry, precondition] BGraph.empty

@@ -19,6 +19,24 @@ let equality_test () = (
   assert (sheap_equals sheap sheap')
 )
 
+let implication_test () = (
+  let b0 = new_bvar ~v:0 () in
+  let b1 = new_bvar ~v:1 () in
+  let b2 = new_bvar ~v:2 () in
+  let p1 = new_pvar ~v:"p1" () in
+  let p2 = new_pvar ~v:"p2" () in
+
+  let formula = And (BlockEq (Block (Pointer p1), BVar b0), Or (BlockEq (Block (Pointer p2), (BVar b1)), BlockEq ((BVar b2), (Block (Pointer p2))))) in 
+  let heap = Heap.singleton (Array b0) in
+  let heap = Heap.add (Array b1) heap in
+  let sheap = formula, heap in
+
+  assert (sheap_single_b sheap p1 = Some b0);
+  assert (sheap_single_b sheap p2 = None)
+)
+
 let () = (
-  equality_test (); ()
+  equality_test (); 
+  implication_test (); 
+  ()
 )

@@ -32,24 +32,24 @@ type symbolicheap = formula * Heap.t
 let rec int_term_to_syntaxterm srk t = 
   match t with 
   | Int i -> Syntax.mk_int srk i
-  | Var v -> Variable.var_to_svar srk v
+  | Var v -> Variable.var_to_svar v
   | Times (i, t) -> Syntax.mk_mul srk [(Syntax.mk_int srk i); (int_term_to_syntaxterm srk t)]
   | Sum (t1, t2) -> Syntax.mk_add srk [(int_term_to_syntaxterm srk t1); (int_term_to_syntaxterm srk t2)]
   | PSub (p1, p2) -> Syntax.mk_sub srk (pointer_term_to_offsetsyntaxterm srk p1) (pointer_term_to_offsetsyntaxterm srk p2)
   | Offset p -> pointer_term_to_offsetsyntaxterm srk p
 and pointer_term_to_offsetsyntaxterm srk p =
   match p with 
-  | Pointer p -> Variable.pvaroffset_to_svar srk p
+  | Pointer p -> Variable.pvaroffset_to_svar p
   | PointerSum (p, t) -> Syntax.mk_add srk [(pointer_term_to_offsetsyntaxterm srk p); (int_term_to_syntaxterm srk t)]
 
   let rec pointer_term_to_blocksyntaxterm srk p =
     match p with 
-    | Pointer p -> Variable.pvarblock_to_svar srk p
+    | Pointer p -> Variable.pvarblock_to_svar p
     | PointerSum (p, _) -> pointer_term_to_blocksyntaxterm srk p
   let block_to_syntaxterm srk b =
   match b with
   | Block p -> pointer_term_to_blocksyntaxterm srk p
-  | BVar b -> Variable.bvar_to_svar srk b
+  | BVar b -> Variable.bvar_to_svar b
 
 
   let rec formula_to_syntaxformula srk (f : formula) : 'a Syntax.formula = 
@@ -89,8 +89,8 @@ let sheap_single_b (f, h : symbolicheap) (p : pvar) : bvar option =
   match Heap.find_first_opt (fun e -> 
     match e with 
     | Array b -> (
-      let b = Variable.bvar_to_svar Global.srk b in 
-      let p = Variable.pvarblock_to_svar Global.srk p in 
+      let b = Variable.bvar_to_svar b in 
+      let p = Variable.pvarblock_to_svar p in 
       let eq = Syntax.mk_eq Global.srk b p in
       reset Global.solver; add Global.solver [s; Syntax.mk_not Global.srk eq];
       match check Global.solver with 

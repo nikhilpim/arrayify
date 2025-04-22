@@ -1,9 +1,14 @@
 (test
  (name test_translator)
-  (libraries llvm)
+  (libraries arrayify llvm)
  )
 
 (test
  (name test_parser)
- (libraries translator llvm llvm.irreader)
+ (libraries arrayify llvm llvm.irreader)
  )
+
+ (test
+ (name test_symbolicheap)
+ (libraries arrayify)
+)

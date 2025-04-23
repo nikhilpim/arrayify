@@ -8,8 +8,9 @@ type boogie_var
 type boogie_avar
 
 val boogie_var_of_var : var -> boogie_var
-val boogie_avar_of_pvar : pvar -> boogie_avar
 val boogie_var_of_pvar : pvar -> boogie_var
+val boogie_avar_of_bvar : bvar -> boogie_avar
+val boogie_length_of_bvar : bvar -> boogie_var 
 
 val var_to_svar : var -> Global.Ctx.t Srkmin.Syntax.arith_term
 val pvarblock_to_svar : pvar -> Global.Ctx.t Srkmin.Syntax.arith_term

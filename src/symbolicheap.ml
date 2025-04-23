@@ -29,6 +29,8 @@ end
 module Heap = Set.Make(HeapElem)
 type symbolicheap = formula * Heap.t
 
+let true_sheap = (True, Heap.singleton TrueHeap)
+
 let rec int_term_to_syntaxterm srk t = 
   match t with 
   | Int i -> Syntax.mk_int srk i

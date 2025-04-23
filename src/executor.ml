@@ -2,11 +2,18 @@ open Symbolicheap
 open Llvmutil
 open Boogieir
 open Llvm
-
+open Variable
 module LlvmGraph = Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge)
 module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
 
 module LLvmNodeSet = Set.Make(LlvmNode)
+
+
+let extract_int_term (v : llvalue) : int_term = 
+  let s = string_of_llvalue v in 
+  match (String.sub s 0 4) with 
+  | "i32 " -> Int (String.sub s 4 (String.length s - 4) |> int_of_string)
+  | _ -> raise (Failure "unimplemented int term extraction")
 
 let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap * boogie_instr list = 
   match instr_opcode instr with 
@@ -48,14 +55,22 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap
     Memory Operators
       *)
     | 	Opcode.Load -> raise (Failure "Not implemented")
-    | 	Opcode.Store -> let value = operand instr 0 |> string_of_llvalue in
-                    assert (String.sub value 0 4 = "i32 ");
-                    let _int_value = String.sub value 4 (String.length value - 4) in
+    | 	Opcode.Store -> (let value = operand instr 0 |> extract_int_term in 
                     let pointer_string = operand instr 1 |> string_of_llvalue in
                     assert (String.sub pointer_string 0 4 = "ptr ");
-                    let _pointer = String.sub pointer_string 4 (String.length pointer_string - 4) in
-                    let _boogie_instrs = [] in 
-                    raise (Failure "Partially Implemented")  
+                    let pointer_pvar = (new_pvar  ~v:(String.sub pointer_string 4 (String.length pointer_string - 4)) ()) in 
+                    match sheap_single_b cond pointer_pvar with 
+                    | Some b -> let boogie_instrs = [
+                        Assert (Leq (Int 0, Var (boogie_var_of_pvar pointer_pvar))); 
+                        Assert (Leq (Var (boogie_var_of_pvar pointer_pvar), Var (boogie_length_of_bvar b))); 
+                        AAssign (boogie_avar_of_bvar b, Store (boogie_avar_of_bvar b, Var (boogie_var_of_pvar pointer_pvar), boogie_term_of_int_term value))
+                      ] in 
+                        cond, boogie_instrs 
+                    | None -> (
+                      let boogie_instrs = [ Assert (Not (True))] in 
+                      true_sheap, boogie_instrs
+                    )
+                    )
     | 	Opcode.GetElementPtr -> raise (Failure "Not implemented")
     | 	Opcode.Trunc -> raise (Failure "Not implemented") 	(*	
     Cast Operators

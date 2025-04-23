@@ -18,6 +18,7 @@ type boogie_formula =
   | And of boogie_formula * boogie_formula
   | Or of boogie_formula * boogie_formula
   | Not of boogie_formula
+  | True
 
 type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
 

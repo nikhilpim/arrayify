@@ -5,11 +5,12 @@ type pvar = string
 type bvar = int 
 
 type boogie_var = string
-type boogie_avar = string
+type boogie_avar = int
 
 let boogie_var_of_var (v: var) : boogie_var = v
-let boogie_avar_of_pvar (p: pvar) : boogie_avar = p
 let boogie_var_of_pvar (p: pvar) : boogie_var = p
+let boogie_avar_of_bvar (b : bvar) : boogie_avar = b
+let boogie_length_of_bvar (b : bvar) : boogie_var = "length"^string_of_int b
 
 let var_to_svar = (Memo.memo (fun v -> Syntax.mk_const Global.srk (Syntax.mk_symbol Global.srk ~name:v `TyInt)))
 let pvarblock_to_svar = (Memo.memo (fun p -> Syntax.mk_const Global.srk (Syntax.mk_symbol Global.srk ~name:("block("^p^")") `TyInt)))

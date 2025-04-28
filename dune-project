@@ -16,11 +16,15 @@
 (documentation https://url/to/documentation)
 
 (package
- (name translator)
+ (name arrayify)
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml llvm)
  (tags
   ("add topics" "to describe" your project)))
 
+(package
+  (name srkmin)
+  (synopsis "Minimal Software Reasoning Kit")
+  (license MIT))
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

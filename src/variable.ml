@@ -1,8 +1,10 @@
 open Srkmin
 
+
 type var = string
 type pvar = string
 type bvar = int 
+type all_var = Variable of var | Pointer of pvar | Block of bvar
 
 type boogie_var = string
 type boogie_avar = int

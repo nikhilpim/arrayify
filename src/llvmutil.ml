@@ -1,5 +1,6 @@
 open Llvm
 open Llvm_irreader
+open Variable
 
 let llvm_block_to_string (block : llbasicblock) : string =
   let instrs = fold_left_instrs (fun acc instr -> string_of_llvalue instr :: acc) [] block in
@@ -15,6 +16,7 @@ module LlvmNode = struct
     let compare = Int.compare
     let equal = Int.equal
     let hash a = Hashtbl.hash a
+    let name t = if t = (-1) then "negone" else string_of_int t
 end
 
 module LlvmEdge  = struct
@@ -42,7 +44,27 @@ let generate_llvm_ir c_file =
   parse_ir ctx mem_buffer
 
 let generate_llvm_graph_from_ir m = 
-  let all_blocks = fold_left_functions (fun acc func -> fold_left_blocks (fun acc block -> block :: acc) acc func) [] m 
+  (* For now, we require that the input is a single function. *)
+  let func = fold_left_functions (fun acc func -> 
+    match acc with 
+    | [] -> [func]
+    | _ -> raise (Failure "Multiple functions in LLVM IR not supported.")
+  ) [] m |> List.hd in 
+  let params = fold_left_params (fun acc param -> 
+    let param_str = string_of_llvalue param in
+    let header = String.sub param_str 0 4 in
+    let name = String.sub param_str 4 (String.length param_str - 4) in
+    if (header = "ptr ") then 
+      let pvar = new_pvar ~v:name () in
+      (Pointer pvar) :: acc
+    else if (header = "i32 ") then 
+      let var = new_var ~v:name () in 
+      (Variable var) :: acc 
+    else 
+      raise (Failure "Unknown parameter type")
+    ) [] func in 
+  (* The entry is the first block of this function that the LLVM module returns *)
+  let all_blocks = fold_left_blocks (fun acc block -> block :: acc) [] func 
     |> List.mapi (fun i e -> (i, e)) in
   let g = List.fold_left (fun graph (i, _) -> LlvmGraph.add_vertex graph i) LlvmGraph.empty all_blocks in
   (* -1 is the designated end vertex. *)
@@ -59,7 +81,7 @@ let generate_llvm_graph_from_ir m =
             LlvmGraph.add_edge_e graph (i, block, i')
           ) term graph)
     ) g all_blocks in
-    g, (List.length all_blocks - 1)
+    g, (List.length all_blocks - 1), params
 
 let generate_llvm_graph c_file = generate_llvm_graph_from_ir (generate_llvm_ir c_file)
 

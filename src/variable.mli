@@ -3,6 +3,7 @@
 type var
 type pvar
 type bvar
+type all_var = Variable of var | Pointer of pvar | Block of bvar
 
 type boogie_var
 type boogie_avar

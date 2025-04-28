@@ -131,13 +131,13 @@ let boogie_instr_text (boogie_instr : boogie_instr) : string =
   | Assert f -> "assert "^bf_text f^";\n"
   | Error -> "error;\n"
 
-let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) : string = 
+let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var list): string = 
   let avars = get_avars g in
   let array_variables = List.fold_left (fun acc b -> ((boogie_avar_name b), boogie_var_name (boogie_length_of_boogie_avar b)) :: acc) [] avars in
   let array_initialization = List.fold_left (fun acc (arr, len) -> acc ^"var "^arr^" : [int]int;\n var "^len^" : int;\n") "" array_variables in 
   let modifies_statement = List.fold_left (fun acc (arr, len) -> "modifies "^arr^","^len^";\n" ^ acc) "" array_variables in 
 
-  let vars = get_vars g in 
+  let vars = get_vars g |> List.filter (fun e -> not ( List.mem e params)) in 
   let var_declarations = List.fold_left (fun acc v -> "var "^(boogie_var_name v)^" : int;\n" ^ acc) "" vars 
       ^ (List.fold_left (fun acc a -> "var "^(boogie_avar_local_name a)^" : [int]int;\n"^ acc ) "" avars) in
   
@@ -162,6 +162,7 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) : string =
       (node_name node)^":\n" ^ (if_creator succ_texts) ^ "\n"
     in
   let procedure_body = var_declarations^(go entry []) in 
-  let procedure = "procedure main() \n" ^ modifies_statement ^ "{\n" ^ procedure_body ^ "}\n" in
+  let parameter_string = String.concat ", " (List.map (fun p -> (boogie_var_name p) ^ " : int") params) in
+  let procedure = "procedure main("^parameter_string^") \n" ^ modifies_statement ^ "{\n" ^ procedure_body ^ "}\n" in
 
   array_initialization ^ procedure

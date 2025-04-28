@@ -1,11 +1,12 @@
 open Llvm
-
+open Variable 
 module LlvmNode :
   sig
     type t 
     val compare : t -> t -> int
     val equal : t -> t -> bool
     val hash : t -> int
+    val name : t -> string
   end
 
 module LlvmEdge :
@@ -19,6 +20,6 @@ module LlvmEdge :
 val llvm_block_to_string : Llvm.llbasicblock -> string
 val block_eq : Llvm.llbasicblock -> Llvm.llbasicblock -> bool
 val generate_llvm_ir : string -> Llvm.llmodule
-val generate_llvm_graph_from_ir : Llvm.llmodule -> Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge).t * LlvmNode.t
-val generate_llvm_graph : string -> Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge).t * LlvmNode.t
+val generate_llvm_graph_from_ir : Llvm.llmodule -> Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge).t * LlvmNode.t * (all_var list)
+val generate_llvm_graph : string -> Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge).t * LlvmNode.t * (all_var list)
 val print_llvm_block : Llvm.llbasicblock -> unit

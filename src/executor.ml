@@ -62,8 +62,8 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap
                     match sheap_single_b cond pointer_pvar with 
                     | Some b -> let boogie_instrs = [
                         Assert (Leq (Int 0, Var (boogie_var_of_pvar pointer_pvar))); 
-                        Assert (Leq (Var (boogie_var_of_pvar pointer_pvar), Var (boogie_length_of_bvar b))); 
-                        AAssign (boogie_avar_of_bvar b, Store (boogie_avar_of_bvar b, Var (boogie_var_of_pvar pointer_pvar), boogie_term_of_int_term value))
+                        Assert (Leq (Var (boogie_var_of_pvar pointer_pvar), Var (boogie_length_of_boogie_avar (boogie_avar_of_bvar b)))); 
+                        AWrite (boogie_avar_of_bvar b, Var (boogie_var_of_pvar pointer_pvar), boogie_term_of_int_term value)
                       ] in 
                         cond, boogie_instrs 
                     | None -> (

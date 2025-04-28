@@ -8,19 +8,16 @@ type boogie_term =
   | Sum of boogie_term * boogie_term
   | Read of boogie_avar * boogie_term
 
-type array_term = 
-  Array of boogie_avar | Store of boogie_avar * boogie_term * boogie_term
-
 type boogie_formula = 
     Leq of boogie_term * boogie_term
   | Eq of boogie_term * boogie_term
-  | AEq of array_term * array_term
+  | AEq of boogie_avar * boogie_avar
   | And of boogie_formula * boogie_formula
   | Or of boogie_formula * boogie_formula
   | Not of boogie_formula
   | True
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * array_term| Assume of boogie_formula | Assert of boogie_formula | Error
+type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | Error
 
 module BGNode : sig
   type t = int * Llvmutil.LlvmNode.t * symbolicheap
@@ -38,4 +35,4 @@ end
 val boogie_term_of_int_term : int_term -> boogie_term 
 val boogie_term_of_pointer_term : pointer_term -> boogie_term
 
-val code_of_boogie_graph : Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> string
+val code_of_boogie_graph : BGNode.t -> Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> string

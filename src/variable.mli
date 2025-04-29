@@ -26,3 +26,6 @@ val bvar_to_svar : bvar -> Global.Ctx.t Srkmin.Syntax.arith_term
 val new_var : ?v:string -> unit -> var
 val new_pvar : ?v:string -> unit -> pvar
 val new_bvar : ?v:int -> unit -> bvar
+
+val prime_var : var -> var
+val prime_pvar : pvar -> pvar

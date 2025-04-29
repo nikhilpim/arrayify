@@ -31,3 +31,5 @@ val true_sheap : symbolicheap
 val empty_sheap : symbolicheap
 val sheap_equals : symbolicheap -> symbolicheap -> bool
 val sheap_single_b : symbolicheap -> pvar -> bvar option 
+
+val quantify_out_var : symbolicheap -> var -> symbolicheap

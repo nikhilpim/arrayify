@@ -14,8 +14,8 @@ let boogie_var_of_pvar (p: pvar) : boogie_var = p
 let boogie_avar_of_bvar (b : bvar) : boogie_avar = b
 let boogie_length_of_boogie_avar (b : boogie_avar) : boogie_var = "length"^string_of_int b
 
-let pvar_name (p : pvar) : string = p
-let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'q' else c) b
+let pvar_name (p : pvar) : string = "p_"^p
+let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'v' else c) b
 let boogie_avar_name (b : boogie_avar) : string = "a"^string_of_int b
 let boogie_avar_local_name (b : boogie_avar) : string = "a"^string_of_int b^"_local"
 
@@ -28,3 +28,6 @@ let bvar_to_svar (b : bvar) : 'a Syntax.arith_term = Syntax.mk_int Global.srk b
 let new_var ?(v : string = "") () : var = v
 let new_pvar ?(v : string = "") () : pvar = v
 let new_bvar ?(v : int =0) (): bvar = v
+
+let prime_var v : var = v^"'"
+let prime_pvar v : var = v^"'"

@@ -103,3 +103,60 @@ let sheap_single_b (f, h : symbolicheap) (p : pvar) : bvar option =
     ) h with 
   | Some (Array b) -> Some b
   | _ -> None
+
+let quantify_out_var (f, h : symbolicheap) (v : var) : symbolicheap = 
+  let rec quantify_out_int_term it v_name = 
+    match it with 
+    | Int _ -> it, false
+    | Var v -> if v = v_name then Var (prime_var v), true else it, false
+    | Times (i, t) -> 
+      let t', b = quantify_out_int_term t v_name in 
+      Times (i, t'), b
+    | Sum (t1, t2) ->
+      let t1', b1 = quantify_out_int_term t1 v_name in 
+      let t2', b2 = quantify_out_int_term t2 v_name in 
+      Sum (t1', t2'), b1 || b2
+    | PSub (p1, p2) -> 
+      let p1', b1 = quantify_out_pointer_term p1 v_name in 
+      let p2', b2 = quantify_out_pointer_term p2 v_name in 
+      PSub (p1', p2'), b1 || b2
+    | Offset p -> 
+      let p', b = quantify_out_pointer_term p v_name in 
+      Offset p', b
+  and quantify_out_pointer_term pt v_name = 
+    match pt with 
+    | Pointer _ -> pt, false
+    | PointerSum (p, t) -> 
+      let p', b = quantify_out_pointer_term p v_name in 
+      let t', b' = quantify_out_int_term t v_name in 
+      PointerSum (p', t'), b || b'
+    in 
+  let rec quantify_out_formula f v_name = 
+    match f with 
+    | True -> True, false
+    | Leq (t1, t2) -> 
+      let t1', b1 = quantify_out_int_term t1 v_name in 
+      let t2', b2 = quantify_out_int_term t2 v_name in 
+      Leq (t1', t2'), b1 || b2
+    | Eq (t1, t2) ->
+      let t1', b1 = quantify_out_int_term t1 v_name in 
+      let t2', b2 = quantify_out_int_term t2 v_name in 
+      Eq (t1', t2'), b1 || b2
+    | BlockEq (_, _) -> f, false
+    | And (f1, f2) -> 
+      let f1', b1 = quantify_out_formula f1 v_name in 
+      let f2', b2 = quantify_out_formula f2 v_name in 
+      And (f1', f2'), b1 || b2
+    | Or (f1, f2) ->
+      let f1', b1 = quantify_out_formula f1 v_name in 
+      let f2', b2 = quantify_out_formula f2 v_name in 
+      Or (f1', f2'), b1 || b2
+    | Not f1 ->
+      let f1', b1 = quantify_out_formula f1 v_name in 
+      Not f1', b1
+    in 
+  let rec go v_name = 
+    let f', b = quantify_out_formula f (prime_var v_name) in 
+    if b then go (prime_var v_name) else quantify_out_formula f' v_name
+  in 
+  (fst (go v)), h

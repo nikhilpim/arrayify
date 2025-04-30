@@ -28,7 +28,7 @@ type boogie_formula =
   | Not of boogie_formula
   | True
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | Error
+type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term | Error
 
 module BGNode = struct 
   type t = int * Llvmutil.LlvmNode.t * symbolicheap
@@ -80,6 +80,7 @@ let get_avars (g : BGraph.t) : boogie_avar list =
     | Assign (_, t) -> fold_bt t acc
     | Assume _ -> acc
     | Assert _ -> acc
+    | IteAssign (_, _, t1, t2) -> fold_bt t1 (fold_bt t2 acc)
     | Error -> acc
     ) acc ops) g BoAvarSet.empty
   |> BoAvarSet.elements
@@ -100,6 +101,7 @@ let get_vars (g : BGraph.t) : boogie_var list =
     | AAssign _ -> acc
     | Assume _ -> acc
     | Assert _ -> acc
+    | IteAssign (v, _, t1, t2) -> fold_bt t1 (fold_bt t2 (BoVarSet.add v acc))
     | Error -> acc
   ) acc ops) g BoVarSet.empty
   |> BoVarSet.elements
@@ -129,6 +131,12 @@ let boogie_instr_text (boogie_instr : boogie_instr) : string =
   | AWrite (a, t1, t2) -> (boogie_avar_name a)^" := "^(boogie_avar_name a)^";\n"^(boogie_avar_name a)^"["^(bt_text t1)^"] := "^(bt_text t2)^";\n"
   | Assume f -> "assume "^bf_text f^";\n"
   | Assert f -> "assert "^bf_text f^";\n"
+  | IteAssign (v, f, t1, t2) -> 
+    let v_text = boogie_var_name v in 
+    let t1_text = bt_text t1 in 
+    let t2_text = bt_text t2 in 
+    let f_text = bf_text f in 
+    "if ("^f_text^") {\n"^v_text^" := "^t1_text^";\n} else {\n"^v_text^" := "^t2_text^";\n}\n"
   | Error -> "error;\n"
 
 let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var list): string = 

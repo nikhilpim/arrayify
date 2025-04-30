@@ -19,7 +19,10 @@ module LlvmNode = struct
     let hash a = Hashtbl.hash a
     let name (l, p) = let l_str = if (l = (-1)) then "ret" else string_of_int l in 
       if p = 0 then l_str else "phi"^l_str^"_"^(string_of_int p)
+    let llvm_identifier (t : t) = fst t
 end
+
+let sink : LlvmNode.t = (-1, 0)
 
 module LlvmEdge  = struct
   type t = llbasicblock 
@@ -68,6 +71,16 @@ let duplicate_phi_nodes (g : LlvmGraph.t) : LlvmGraph.t =
         LlvmGraph.remove_vertex with_new_edges phi_node 
       ) g phi_nodes
 
+let block_id block = 
+  let func = block_parent block in 
+  let entry = entry_block func in
+  if block_eq entry block then 0 else (
+  let block_str = string_of_llvalue (value_of_block block) |> String.trim |> String.split_on_char ' ' |> List.hd in
+  let id_str = String.sub block_str 0 (String.length block_str - 1) in
+  int_of_string id_str)
+
+
+
 let generate_llvm_graph_from_ir m = 
   (* For now, we require that the input is a single function. *)
   let func = fold_left_functions (fun acc func -> 
@@ -75,6 +88,7 @@ let generate_llvm_graph_from_ir m =
     | [] -> [func]
     | _ -> raise (Failure "Multiple functions in LLVM IR not supported.")
   ) [] m |> List.hd in 
+
   let params = fold_left_params (fun acc param -> 
     let param_str = string_of_llvalue param in
     let header = String.sub param_str 0 4 in
@@ -88,11 +102,12 @@ let generate_llvm_graph_from_ir m =
     else 
       raise (Failure "Unknown parameter type")
     ) [] func in 
+
   (* The entry is the first block of this function that the LLVM module returns *)
   let all_blocks = fold_left_blocks (fun acc block -> block :: acc) [] func 
-    |> List.mapi (fun i e -> ((i, 0), e)) in
+    |> List.map (fun e -> ((block_id e, 0), e)) in
   let g = List.fold_left (fun graph (i, _) -> LlvmGraph.add_vertex graph i) LlvmGraph.empty all_blocks in
-  (* -1 is the designated end vertex. *)
+  (* (-1, 0) is the designated end vertex. *)
   let g = LlvmGraph.add_vertex g (-1, 0) in
   let g = List.fold_left (fun graph (i, block) -> 
       let terminator = block_terminator block in
@@ -102,11 +117,10 @@ let generate_llvm_graph_from_ir m =
         (* If we're looking at a return, we want to add an edge to a designated end location (-1). I assume that returns are all terminators with no successors. *)
         if num_successors term = 0 then (LlvmGraph.add_edge_e graph (i, block, (-1, 0))) else 
           (fold_successors (fun succ graph -> 
-            let (i', _) = List.find (fun (_, block') -> block_eq block' succ) all_blocks in
-            LlvmGraph.add_edge_e graph (i, block, i')
+            LlvmGraph.add_edge_e graph (i, block, (block_id succ, 0))
           ) term graph)
     ) g all_blocks in
-    g |> duplicate_phi_nodes, (List.length all_blocks - 1, 0), params
+    g |> duplicate_phi_nodes, (0, 0), params
 
 let generate_llvm_graph c_file = generate_llvm_graph_from_ir (generate_llvm_ir c_file)
 

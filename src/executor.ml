@@ -3,7 +3,7 @@ open Llvmutil
 open Boogieir
 open Llvm
 open Variable
-module LlvmGraph = Graph.Persistent.Digraph.ConcreteLabeled(LlvmNode)(LlvmEdge)
+module LlvmGraph = Graph.Persistent.Digraph.Concrete(LlvmNode)
 module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
 
 module LLvmNodeSet = Set.Make(LlvmNode)
@@ -18,38 +18,15 @@ let extract_int_term (v : llvalue) : int_term =
       else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
   | _ -> raise (Failure "unimplemented int term extraction")
 
-let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (_src : LlvmNode.t) (tgt : LlvmNode.t) : symbolicheap * boogie_instr list = 
+let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap * boogie_instr list = 
   match instr_opcode instr with 
     | 	Opcode.Invalid -> raise (Failure "Not implemented") 	(*	
     Not an instruction
       *)
-    | 	Opcode.Ret -> cond, [] 	(*	
+    | 	Opcode.Ret -> cond, [] (*	
     Terminator Instructions
       *)
-    | 	Opcode.Br -> (
-      match get_branch instr with 
-        | Some (`Conditional (_, taken_block, not_taken_block))  -> (
-            let cmp_flag_name = (string_of_llvalue instr |> String.trim |> String.split_on_char ' ' |> List.nth) 2 in 
-            let cmp_flag_name = String.sub cmp_flag_name 0 (String.length cmp_flag_name - 1) in
-            let cmp_flag = new_var ~v:cmp_flag_name () in
-            let taken = Llvmutil.block_id taken_block in 
-            let not_taken = Llvmutil.block_id not_taken_block in
-            if ((LlvmNode.llvm_identifier tgt) = taken) then (
-              let sheap_taken = Symbolicheap.Eq (Var cmp_flag, Int 1) in 
-              let boogie_taken = [Assume (Eq (Var (boogie_var_of_var cmp_flag), Int 1))] in 
-              let f, h = cond in 
-              (Symbolicheap.And (f, sheap_taken), h), boogie_taken
-              ) else if (LlvmNode.llvm_identifier tgt = not_taken) then (
-                let sheap_not_taken = Symbolicheap.Eq (Var cmp_flag, Int 0) in
-                let boogie_not_taken = [Assume (Eq (Var (boogie_var_of_var cmp_flag), Int 0))] in
-                let f, h = cond in 
-                (Symbolicheap.And (f, sheap_not_taken), h), boogie_not_taken
-              ) else (
-                raise (Failure ("Symbolic update stepping to LLVM identifier that is not in branch statement: Branches are "^(string_of_int taken)^" and "^(string_of_int not_taken)^" but tgt is "^(LlvmNode.name tgt)))
-              ))
-        | Some (`Unconditional _) -> cond, []
-        | _ -> raise (Failure "Not implemented") 
-      )
+    | 	Opcode.Br -> cond, []
     | 	Opcode.Switch -> raise (Failure "Not implemented")
     | 	Opcode.IndirectBr -> raise (Failure "Not implemented")
     | 	Opcode.Invoke -> raise (Failure "Not implemented")
@@ -91,7 +68,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (_src : LlvmNo
                         Assert (Leq (Var (boogie_var_of_pvar pointer_pvar), Var (boogie_length_of_boogie_avar (boogie_avar_of_bvar b)))); 
                         AWrite (boogie_avar_of_bvar b, Var (boogie_var_of_pvar pointer_pvar), boogie_term_of_int_term value)
                       ] in 
-                        cond, boogie_instrs 
+                        cond, boogie_instrs
                     | None -> (
                       let boogie_instrs = [ Assert (Not (True))] in 
                       true_sheap, boogie_instrs
@@ -160,8 +137,8 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (_src : LlvmNo
 
 
 (* If Llvm basic block [weight] is executed from state [precondition], the output (postcondition, instrs) should be the post state [postcondition] and the equivalent translation in Boogie [instrs] *)
-let symbolic_update (weight: LlvmEdge.t) (precondition : symbolicheap) (src : LlvmNode.t) (tgt : LlvmNode.t) : symbolicheap * boogie_instr list = 
-  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond src tgt in post, blist @ boogie_translation) (precondition, []) weight 
+let symbolic_update (src : LlvmNode.t) (precondition : symbolicheap) : symbolicheap * boogie_instr list = 
+  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
 
 (* Given a state [postcondition], computes most precise widening in finite class *)
 let widen (postcondition : symbolicheap) : symbolicheap = 
@@ -169,33 +146,90 @@ let widen (postcondition : symbolicheap) : symbolicheap =
   raise (Failure "Not implemented")
 
 (* Checks if [from] entails [towards] up to arbitrary permutation of the block variables. Returns None if not, or otherwise Some (to, instrs) where instrs encodes the permutation in Boogie *)
-let check_rotate_entails (from : BGNode.t) (towards : BGNode.t) : (BGNode.t * boogie_instr list) option = 
+let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) (_recipient : BGNode.t): (BGNode.t * boogie_instr list) option = 
   let _ = (from, towards) in 
   raise (Failure "Not implemented")
 
-let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolicheap) : BGraph.t = 
+let gen_boogie_edge (from : BGNode.t) (towards : BGNode.t) (rotation : boogie_instr list option) : BGEdge.t = 
+  let (_, from_node, _, _) = from in 
+  let (_, towards_node, _, _) = towards in
+  match block_terminator (LlvmNode.llvm_block from_node) with
+  | None -> None, rotation
+  | Some terminator -> if (is_conditional terminator) then 
+  (
+    match get_branch terminator with 
+    | Some (`Conditional (_, taken_block, not_taken_block)) -> (
+      let cmp_flag_name = (string_of_llvalue terminator |> String.trim |> String.split_on_char ' ' |> List.nth) 2 in 
+            let cmp_flag_name = String.sub cmp_flag_name 0 (String.length cmp_flag_name - 1) in
+            let cmp_flag = new_var ~v:cmp_flag_name () in
+            let branch_condition = if (Llvmutil.block_eq (LlvmNode.llvm_block towards_node) (taken_block)) then ((Eq (Var (boogie_var_of_var cmp_flag), Int 1))) 
+            else (if (Llvmutil.block_eq (LlvmNode.llvm_block towards_node) not_taken_block) then ((Eq (Var (boogie_var_of_var cmp_flag), Int 0))) 
+            else (raise (Failure "towards not in branch statement"))) in 
+      Some branch_condition, rotation
+    )
+    | Some (`Unconditional _) -> None, rotation
+    | None -> raise (Failure "Not implemented")
+  )
+  else (None, rotation) 
+
+let gen_branch_condition (from : LlvmNode.t) (towards : LlvmNode.t) : formula = 
+  match block_terminator (LlvmNode.llvm_block from) with 
+  | None -> Symbolicheap.True
+  | Some terminator -> if (is_conditional terminator) then 
+  (
+    match get_branch terminator with 
+    | Some (`Conditional (_, taken_block, not_taken_block)) -> (
+      let cmp_flag_name = (string_of_llvalue terminator |> String.trim |> String.split_on_char ' ' |> List.nth) 2 in 
+      let cmp_flag_name = String.sub cmp_flag_name 0 (String.length cmp_flag_name - 1) in
+      let cmp_flag = new_var ~v:cmp_flag_name () in
+      let branch_condition = if (Llvmutil.block_eq (LlvmNode.llvm_block towards) (taken_block)) then ((Symbolicheap.Eq (Var cmp_flag, Int 1))) 
+      else (if (Llvmutil.block_eq (LlvmNode.llvm_block towards) not_taken_block) then ((Eq (Var cmp_flag, Int 0))) 
+      else (raise (Failure "towards not in branch statement"))) in 
+      branch_condition
+    )
+    | Some (`Unconditional _) -> Symbolicheap.True
+    | None -> raise (Failure "Not implemented")
+  )
+  else Symbolicheap.True 
+
+
+let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolicheap) : BGraph.t * BGNode.t = 
   (* For now, widening points will be computed via backedges *) 
-   let rec go worklist bgraph = 
-    if worklist = [] then bgraph else (
+   let rec go worklist bgraph edges = 
+    if worklist = [] then bgraph, edges else (
       let (repeat_ct, node, precondition) = List.hd worklist in 
       let worklist = List.tl worklist in
-      let worklist, bgraph = LlvmGraph.fold_succ_e (fun (src, weight, tgt) (worklist, bgraph) -> 
-            let postcondition, boogie_instrs = symbolic_update weight precondition src tgt in 
-            let post_repeat = BGraph.fold_vertex (fun (r, l, _) m -> if LlvmNode.equal l tgt then max m (r + 1) else m) bgraph (0) in 
-            if ((not (LlvmNode.equal tgt Llvmutil.sink)) && LlvmNode.compare tgt src < 0) then (
-              print_string (LlvmNode.name src); print_string (LlvmNode.name tgt);
-              let widened_postcondition = widen postcondition in
-              match BGraph.fold_vertex (fun node find -> match find with Some _ -> find | None -> check_rotate_entails (post_repeat, tgt, widened_postcondition) node) bgraph None with 
-              | None -> 
-                let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs, (post_repeat, tgt, widened_postcondition)) in 
-                (post_repeat, tgt, widened_postcondition) :: worklist, bgraph
-              | Some (repeat, rotation) ->
-                let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs @ rotation, repeat) in
-                worklist, bgraph )
-            else (
-            let bgraph = BGraph.add_edge_e bgraph ((repeat_ct, node, precondition), boogie_instrs, (post_repeat, tgt, postcondition)) in 
-            (post_repeat, tgt, postcondition) :: worklist, bgraph)
-           ) graph node (worklist, bgraph) in 
-      go worklist bgraph )
-  in 
-  go [0, entry, precondition] BGraph.empty
+      let post, boogie_instrs = symbolic_update node precondition in 
+      let (replacement_bnode : BGNode.t) = (repeat_ct, node, precondition, boogie_instrs) in 
+      let bgraph = BGraph.add_vertex bgraph replacement_bnode in
+      let worklist, edges = LlvmGraph.fold_succ (fun succ (worklist, edges) ->
+          let post_with_branch = Symbolicheap.And ((fst post), gen_branch_condition node succ), snd post in
+          let new_repeat_ct = BGraph.fold_vertex (fun (r, l, _, _) m -> if LlvmNode.equal l succ then max m (r + 1) else m) bgraph (0) in
+          let new_repeat_ct = List.fold_left (fun m (r, l, _) -> if LlvmNode.equal l succ then max m (r + 1) else m) new_repeat_ct worklist in
+          if (LlvmNode.compare succ node < 0) then (
+            let widened_postcondition = widen post_with_branch in
+            let exists_covering_vertex = BGraph.fold_vertex (fun previous_bnode find -> 
+              let (_, previous_node, previous_cond, _) = previous_bnode in 
+              match (find, LlvmNode.equal previous_node succ) with 
+              | (Some _), _ | _, false -> find 
+              | None, true -> check_rotate_entails widened_postcondition previous_cond previous_bnode) bgraph None in 
+            match exists_covering_vertex with 
+              | None -> (new_repeat_ct, succ, widened_postcondition) :: worklist, (replacement_bnode, (new_repeat_ct, succ), None) :: edges
+              | Some ((r, n, _, _), rotation) -> worklist, (replacement_bnode, (r, n), Some rotation) :: edges 
+          ) else (
+            (new_repeat_ct, succ, post_with_branch) :: worklist, (replacement_bnode, (new_repeat_ct, succ), None) :: edges
+          )
+        ) graph node (worklist, edges) in 
+      go worklist bgraph edges
+    )
+      in 
+      let bgraph, edges = go [0, entry, precondition] BGraph.empty [] in 
+
+      BGraph.fold_vertex (fun bnode bgraph -> 
+          let relevant_edges = List.filter (fun e -> let (_, (r, n), _) = e in let (r', n', _, _) = bnode in r = r' && LlvmNode.equal n n') edges in
+          List.fold_left (fun bgraph (pred, _, rotation) -> 
+              BGraph.add_edge_e bgraph (pred, gen_boogie_edge pred bnode rotation, bnode) 
+            ) bgraph relevant_edges
+      ) bgraph bgraph,
+      (0, entry, precondition, symbolic_update entry precondition |> snd)
+      

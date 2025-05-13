@@ -36,6 +36,7 @@ module LlvmNode = struct
       if p = 0 then l_str else "phi"^l_str^"_"^(string_of_int p)
     let llvm_identifier (x, _, _ : t) = x
     let llvm_block (_, _, block : t) = block
+    let phi_num (_, p, _) = p
 end
 
 

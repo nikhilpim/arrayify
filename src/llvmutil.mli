@@ -9,6 +9,7 @@ module LlvmNode :
     val name : t -> string
     val llvm_identifier : t -> int
     val llvm_block : t -> Llvm.llbasicblock
+    val phi_num : t -> int
   end
 
 

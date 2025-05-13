@@ -18,7 +18,10 @@ let extract_int_term (v : llvalue) : int_term =
       else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
   | _ -> raise (Failure "unimplemented int term extraction")
 
-let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap * boogie_instr list = 
+let extract_target (v : llvalue) : string = 
+  string_of_llvalue v |> String.trim |> String.split_on_char ' ' |> List.hd
+
+let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int) : symbolicheap * boogie_instr list = 
   match instr_opcode instr with 
     | 	Opcode.Invalid -> raise (Failure "Not implemented") 	(*	
     Not an instruction
@@ -117,7 +120,17 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap
     Other Operators
       *)
     | 	Opcode.FCmp -> raise (Failure "Not implemented")
-    | 	Opcode.PHI -> raise (Failure "Not implemented")
+    | 	Opcode.PHI -> (
+        let term = operand instr (phi_num - 1) |> extract_int_term in 
+        let tgt = extract_target instr in
+        let tgt_var = new_var ~v:tgt () in
+        let boogie_instrs = [
+          Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term term);
+        ]  in 
+        let f, h = (quantify_out_var cond tgt_var) in
+        let postcond = Symbolicheap.And (Eq (Var tgt_var, term), f), h in
+         postcond, boogie_instrs
+        )
     | 	Opcode.Call -> raise (Failure "Not implemented")
     | 	Opcode.Select -> raise (Failure "Not implemented")
     | 	Opcode.UserOp1 -> raise (Failure "Not implemented")
@@ -138,7 +151,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) : symbolicheap
 
 (* If Llvm basic block [weight] is executed from state [precondition], the output (postcondition, instrs) should be the post state [postcondition] and the equivalent translation in Boogie [instrs] *)
 let symbolic_update (src : LlvmNode.t) (precondition : symbolicheap) : symbolicheap * boogie_instr list = 
-  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
+  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond (LlvmNode.phi_num src) in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
 
 (* Given a state [postcondition], computes most precise widening in finite class *)
 let widen (postcondition : symbolicheap) : symbolicheap = 

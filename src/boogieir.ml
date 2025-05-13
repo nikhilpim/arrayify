@@ -31,20 +31,20 @@ type boogie_formula =
 type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term | Error
 
 module BGNode = struct 
-  type t = int * Llvmutil.LlvmNode.t * symbolicheap
+  type t = int * Llvmutil.LlvmNode.t * symbolicheap * boogie_instr list
   let hash = Hashtbl.hash 
 
-  let compare (a, b, _) (c, d, _) = if b < d then -1 else if b > d then 1 else if a < c then -1 else if a > c then 1 else 0
+  let compare (a, b, _, _) (c, d, _, _) = if b < d then -1 else if b > d then 1 else if a < c then -1 else if a > c then 1 else 0
 
-  let equal (a, b, _) (c, d, _) = (b = d) && (a = c)
+  let equal (a, b, _, _) (c, d, _, _) = (b = d) && (a = c)
 end
 
 module BGEdge = struct
-  type t = boogie_instr list 
+  type t = boogie_formula option * boogie_instr list option
   let hash = Hashtbl.hash
   let compare a b = if hash a < hash b then -1 else if hash a > hash b then 1 else 0 
   let equal a b = (hash a = hash b)
-  let default = []
+  let default = None, None
 end
 
 module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
@@ -73,7 +73,7 @@ let get_avars (g : BGraph.t) : boogie_avar list =
     | Sum (t1, t2) -> fold_bt t1 (fold_bt t2 acc)
     | Read (at, t) -> BoAvarSet.add at (fold_bt t acc)
   in 
-  BGraph.fold_edges_e (fun (_, ops, _) acc -> List.fold_left (fun acc op -> 
+  BGraph.fold_vertex (fun (_, _, _, ops) acc -> List.fold_left (fun acc op -> 
     match op with 
     | AAssign (a1, a2) -> BoAvarSet.add a1 (BoAvarSet.add a2 acc)
     | AWrite (a, t1, t2) -> BoAvarSet.add a (fold_bt t1 (fold_bt t2 acc))
@@ -94,7 +94,7 @@ let get_vars (g : BGraph.t) : boogie_var list =
     | Sum (t1, t2) -> fold_bt t1 (fold_bt t2 acc)
     | Read (_, t) -> fold_bt t acc
   in 
-  BGraph.fold_edges_e (fun (_, ops, _) acc -> List.fold_left (fun acc op -> 
+  BGraph.fold_vertex (fun (_, _, _, ops) acc -> List.fold_left (fun acc op -> 
     match op with 
     | Assign (v, t) -> fold_bt t (BoVarSet.add v acc)
     | AWrite (_, t1, t2) -> fold_bt t1 (fold_bt t2 acc)
@@ -149,25 +149,27 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
   let var_declarations = List.fold_left (fun acc v -> "var "^(boogie_var_name v)^" : int;\n" ^ acc) "" vars 
       ^ (List.fold_left (fun acc a -> "var "^(boogie_avar_local_name a)^" : [int]int;\n"^ acc ) "" avars) in
   
-  let node_name = (fun (i, j, _) -> "codelabel"^(string_of_int i)^"_"^(Llvmutil.LlvmNode.name j)) in
+  let (node_name : BGNode.t -> string) = (fun (i, j, _, _) -> "codelabel"^(string_of_int i)^"_"^(Llvmutil.LlvmNode.name j)) in
 
-  let rec go node seen = 
+  let rec go (node : BGNode.t) seen = 
     if List.mem (node_name node) seen then "goto "^(node_name node)^";\n" else 
       let seen = (node_name node) :: seen in 
       let succs = BGraph.succ_e g node in 
-      let succ_texts = List.map (fun (_, instrs, succ_node) -> 
-        let instr_texts = String.concat "" (List.map boogie_instr_text instrs) in 
-        let succ_text = go succ_node seen in
-      instr_texts ^ succ_text
+      let succ_texts = List.map (fun (_, (cond, rotation), tgt) -> 
+        let rotation_text = 
+          match rotation with 
+          | Some instrs -> String.concat "" (List.map boogie_instr_text instrs)
+          | None -> ""
+        in 
+        match cond with 
+        | None -> rotation_text ^ go tgt seen 
+        | Some f -> 
+          let succ_text = go tgt seen in 
+          "if ("^(bf_text f)^") {\n" ^ rotation_text ^ succ_text ^ "}"
       ) succs in 
-
-      let rec if_creator succ_texts = 
-        match succ_texts with 
-        | [] -> ""
-        | [x] -> x
-        | x :: xs -> "if (*) {\n" ^ x ^ "} else \n" ^ (if_creator xs)
-      in
-      (node_name node)^":\n" ^ (if_creator succ_texts) ^ "\n"
+      let (_, _, _, instrs) = node in
+      let node_text = String.concat "" (List.map boogie_instr_text instrs) in 
+      (node_name node)^":\n" ^ node_text ^ (String.concat " else " succ_texts) ^ "\n" 
     in
   let procedure_body = var_declarations^(go entry []) in 
   let parameter_string = String.concat ", " (List.map (fun p -> (boogie_var_name p) ^ " : int") params) in

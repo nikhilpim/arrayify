@@ -28,7 +28,16 @@ type boogie_formula =
   | Not of boogie_formula
   | True
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term | Error
+type boogie_instr = 
+| Assign of boogie_var * boogie_term 
+| AAssign of boogie_avar * boogie_avar 
+| AWrite of boogie_avar * boogie_term * boogie_term 
+| Assume of boogie_formula 
+| Assert of boogie_formula 
+| IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term 
+| Return of boogie_var
+| Error
+
 
 module BGNode = struct 
   type t = int * Llvmutil.LlvmNode.t * symbolicheap * boogie_instr list
@@ -81,6 +90,7 @@ let get_avars (g : BGraph.t) : boogie_avar list =
     | Assume _ -> acc
     | Assert _ -> acc
     | IteAssign (_, _, t1, t2) -> fold_bt t1 (fold_bt t2 acc)
+    | Return _ -> acc
     | Error -> acc
     ) acc ops) g BoAvarSet.empty
   |> BoAvarSet.elements
@@ -102,6 +112,7 @@ let get_vars (g : BGraph.t) : boogie_var list =
     | Assume _ -> acc
     | Assert _ -> acc
     | IteAssign (v, _, t1, t2) -> fold_bt t1 (fold_bt t2 (BoVarSet.add v acc))
+    | Return v -> BoVarSet.add v acc
     | Error -> acc
   ) acc ops) g BoVarSet.empty
   |> BoVarSet.elements
@@ -137,6 +148,7 @@ let boogie_instr_text (boogie_instr : boogie_instr) : string =
     let t2_text = bt_text t2 in 
     let f_text = bf_text f in 
     "if ("^f_text^") {\n"^v_text^" := "^t1_text^";\n} else {\n"^v_text^" := "^t2_text^";\n}\n"
+  | Return v -> "retval := "^boogie_var_name v^";\n"
   | Error -> "error;\n"
 
 let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var list): string = 
@@ -144,6 +156,7 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
   let array_variables = List.fold_left (fun acc b -> ((boogie_avar_name b), boogie_var_name (boogie_length_of_boogie_avar b)) :: acc) [] avars in
   let array_initialization = List.fold_left (fun acc (arr, len) -> acc ^"var "^arr^" : [int]int;\n var "^len^" : int;\n") "" array_variables in 
   let modifies_statement = List.fold_left (fun acc (arr, len) -> "modifies "^arr^","^len^";\n" ^ acc) "" array_variables in 
+  let returns_statement = "returns (retval : int)\n" in 
 
   let vars = get_vars g |> List.filter (fun e -> not ( List.mem e params)) in 
   let var_declarations = List.fold_left (fun acc v -> "var "^(boogie_var_name v)^" : int;\n" ^ acc) "" vars 
@@ -173,6 +186,6 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
     in
   let procedure_body = var_declarations^(go entry []) in 
   let parameter_string = String.concat ", " (List.map (fun p -> (boogie_var_name p) ^ " : int") params) in
-  let procedure = "procedure main("^parameter_string^") \n" ^ modifies_statement ^ "{\n" ^ procedure_body ^ "}\n" in
+  let procedure = "procedure main("^parameter_string^") \n" ^ returns_statement ^ modifies_statement ^ "{\n" ^ procedure_body ^ "}\n" in
 
   array_initialization ^ procedure

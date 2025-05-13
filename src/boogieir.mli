@@ -17,7 +17,15 @@ type boogie_formula =
   | Not of boogie_formula
   | True
 
-type boogie_instr = Assign of boogie_var * boogie_term | AAssign of boogie_avar * boogie_avar | AWrite of boogie_avar * boogie_term * boogie_term | Assume of boogie_formula | Assert of boogie_formula | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term | Error
+type boogie_instr = 
+| Assign of boogie_var * boogie_term 
+| AAssign of boogie_avar * boogie_avar 
+| AWrite of boogie_avar * boogie_term * boogie_term 
+| Assume of boogie_formula 
+| Assert of boogie_formula 
+| IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term 
+| Return of boogie_var
+| Error
 
 module BGNode : sig
   type t = int * Llvmutil.LlvmNode.t * symbolicheap * boogie_instr list

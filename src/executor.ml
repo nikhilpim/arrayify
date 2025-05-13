@@ -26,7 +26,13 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.Invalid -> raise (Failure "Not implemented") 	(*	
     Not an instruction
       *)
-    | 	Opcode.Ret -> cond, [] (*	
+    | 	Opcode.Ret -> (
+      let var_name = string_of_llvalue instr |> String.trim |> String.split_on_char ' ' |> List.rev |> List.hd in
+      let boogie_instrs = [
+        Return (boogie_var_of_var (new_var ~v:var_name ()));
+      ]  in 
+      cond, boogie_instrs
+    ) (*	
     Terminator Instructions
       *)
     | 	Opcode.Br -> cond, []

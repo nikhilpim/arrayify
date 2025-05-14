@@ -29,3 +29,5 @@ val new_bvar : ?v:int -> unit -> bvar
 
 val prime_var : var -> var
 val prime_pvar : pvar -> pvar
+
+val generate_new_bvar : boogie_avar list -> bvar

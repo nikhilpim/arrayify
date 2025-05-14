@@ -155,8 +155,75 @@ let quantify_out_var (f, h : symbolicheap) (v : var) : symbolicheap =
       let f1', b1 = quantify_out_formula f1 v_name in 
       Not f1', b1
     in 
-  let rec go v_name = 
-    let f', b = quantify_out_formula f (prime_var v_name) in 
-    if b then go (prime_var v_name) else quantify_out_formula f' v_name
+  let rec go v_name formula = 
+    let f', b = quantify_out_formula formula (prime_var v_name) in 
+    if b then go (prime_var v_name) f' else quantify_out_formula f' v_name
   in 
-  (fst (go v)), h
+  (fst (go v f)), h
+
+let quantify_out_pvar (f, h : symbolicheap) (p : pvar) : symbolicheap = 
+  let rec quantify_out_int_term it p_name = 
+    match it with 
+    | Int _ -> it, false
+    | Var _ -> it, false
+    | Times (i, t) -> 
+      let t', b = quantify_out_int_term t p_name in 
+      Times (i, t'), b
+    | Sum (t1, t2) ->
+      let t1', b1 = quantify_out_int_term t1 p_name in 
+      let t2', b2 = quantify_out_int_term t2 p_name in 
+      Sum (t1', t2'), b1 || b2
+    | PSub (p1, p2) -> 
+      let p1', b1 = quantify_out_pointer_term p1 p_name in 
+      let p2', b2 = quantify_out_pointer_term p2 p_name in 
+      PSub (p1', p2'), b1 || b2
+    | Offset p -> 
+      let p', b = quantify_out_pointer_term p p_name in 
+      Offset p', b
+  and quantify_out_pointer_term pt p_name = 
+    match pt with 
+    | Pointer p -> if p = p_name then Pointer (prime_pvar p), true else pt, false
+    | PointerSum (p, t) -> 
+      let p', b = quantify_out_pointer_term p p_name in 
+      let t', b' = quantify_out_int_term t p_name in 
+      PointerSum (p', t'), b || b'
+  in 
+  let quantify_out_block b p_name = 
+    match b with 
+    | Block p -> 
+      let p', b = quantify_out_pointer_term p p_name in 
+      Block p', b
+    | BVar _ -> b, false
+  in
+  let rec quantify_out_formula f p_name = 
+    match f with 
+    | True -> True, false
+    | Leq (t1, t2) -> 
+      let t1', b1 = quantify_out_int_term t1 p_name in 
+      let t2', b2 = quantify_out_int_term t2 p_name in 
+      Leq (t1', t2'), b1 || b2
+    | Eq (t1, t2) ->
+      let t1', b1 = quantify_out_int_term t1 p_name in 
+      let t2', b2 = quantify_out_int_term t2 p_name in 
+      Eq (t1', t2'), b1 || b2
+    | BlockEq (bt1, bt2) -> 
+      let bt1', b1 = quantify_out_block bt1 p_name in 
+      let bt2', b2 = quantify_out_block bt2 p_name in 
+      BlockEq (bt1', bt2'), b1 || b2
+    | And (f1, f2) -> 
+      let f1', b1 = quantify_out_formula f1 p_name in 
+      let f2', b2 = quantify_out_formula f2 p_name in 
+      And (f1', f2'), b1 || b2
+    | Or (f1, f2) ->
+      let f1', b1 = quantify_out_formula f1 p_name in 
+      let f2', b2 = quantify_out_formula f2 p_name in 
+      Or (f1', f2'), b1 || b2
+    | Not f1 ->
+      let f1', b1 = quantify_out_formula f1 p_name in 
+      Not f1', b1
+  in
+  let rec go p_name formula = 
+    let f', b = quantify_out_formula formula (prime_pvar p_name) in 
+    if b then go (prime_pvar p_name) f' else quantify_out_formula f' p_name
+  in 
+  (fst (go p f)), h

@@ -7,21 +7,43 @@ module LlvmGraph = Graph.Persistent.Digraph.Concrete(LlvmNode)
 module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
 
 module LLvmNodeSet = Set.Make(LlvmNode)
-
+module Heap = Set.Make(HeapElem)
 
 let extract_int_term (v : llvalue) : int_term = 
-  let s = string_of_llvalue v in 
-  match (String.sub s 0 4) with 
-  | "i32 " -> 
+  let s = string_of_llvalue v |> String.trim in 
+  if ((String.sub s 0 4) = "i32 ") then 
+    (
+      let value_str = String.sub s 4 (String.length s - 4) in
+      if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
+        else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
+    ) else 
+  if ((String.sub s 0 4) = "i64 ") then 
+    (
     let value_str = String.sub s 4 (String.length s - 4) in
     if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
       else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
-  | _ -> raise (Failure "unimplemented int term extraction")
+    ) else 
+  if (String.get s 0 = '%') then (
+      let var_name = s |> String.trim |> String.split_on_char ' ' |> List.hd in
+      let var = new_var ~v:var_name () in
+      Var var
+  ) else 
+    raise (Failure "unimplemented int term extraction")
+
+let extract_pointer (v : llvalue) : pvar = 
+  let s = string_of_llvalue v |> String.trim in 
+  if ((String.sub s 0 4) = "ptr ") then 
+    (
+      new_pvar ~v:(String.sub s 4 (String.length s - 4)) ()
+    ) else if (String.get s 0 = '%') then 
+      (let pvar_name = s |> String.trim |> String.split_on_char ' ' |> List.hd in
+      new_pvar ~v:pvar_name ()) 
+  else (raise (Failure "unimplemented pointer extraction"))
 
 let extract_target (v : llvalue) : string = 
   string_of_llvalue v |> String.trim |> String.split_on_char ' ' |> List.hd
 
-let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int) : symbolicheap * boogie_instr list = 
+let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int) (bgraph : BGraph.t) : symbolicheap * boogie_instr list = 
   match instr_opcode instr with 
     | 	Opcode.Invalid -> raise (Failure "Not implemented") 	(*	
     Not an instruction
@@ -41,7 +63,20 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.Invoke -> raise (Failure "Not implemented")
     | 	Opcode.Invalid2 -> raise (Failure "Not implemented")
     | 	Opcode.Unreachable -> raise (Failure "Not implemented")
-    | 	Opcode.Add  -> raise (Failure "Not implemented")	(*	
+    | 	Opcode.Add  -> (
+      let tgt = extract_target instr in
+      let tgt_var = new_var ~v:tgt () in  
+      let left = operand instr 0 |> extract_int_term in
+      let right = operand instr 1 |> extract_int_term in
+      let term = Symbolicheap.Sum (left, right) in
+      let boogie_instrs = [
+        Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term term);
+      ]  in
+      let f, h = (quantify_out_var cond tgt_var) in
+      let postcond = Symbolicheap.And (Eq (Var tgt_var, term), f), h in
+      postcond, boogie_instrs
+
+    )	(*	
     Standard Binary Operators
       *)
     | 	Opcode.FAdd -> raise (Failure "Not implemented")
@@ -68,9 +103,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
       *)
     | 	Opcode.Load -> raise (Failure "Not implemented")
     | 	Opcode.Store -> (let value = operand instr 0 |> extract_int_term in 
-                    let pointer_string = operand instr 1 |> string_of_llvalue in
-                    assert (String.sub pointer_string 0 4 = "ptr ");
-                    let pointer_pvar = (new_pvar  ~v:(String.sub pointer_string 4 (String.length pointer_string - 4)) ()) in 
+                    let pointer_pvar = extract_pointer (operand instr 1) in 
                     match sheap_single_b cond pointer_pvar with 
                     | Some b -> let boogie_instrs = [
                         Assert (Leq (Int 0, Var (boogie_var_of_pvar pointer_pvar))); 
@@ -83,7 +116,17 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
                       true_sheap, boogie_instrs
                     )
                     )
-    | 	Opcode.GetElementPtr -> raise (Failure "Not implemented")
+    | 	Opcode.GetElementPtr -> (
+      let pointer = operand instr 0 |> extract_pointer in
+      let offset = operand instr 1 |> extract_int_term in
+      let tgt = extract_target instr in
+      let tgt_var = new_pvar ~v:tgt () in
+      let boogie_instrs = [
+        Assign (boogie_var_of_pvar tgt_var, boogie_term_of_int_term offset);
+      ] in
+      let f, h = (quantify_out_pvar cond tgt_var) in
+      let postcond = Symbolicheap.And ((BlockEq ((Block (Pointer pointer)) , (Block (Pointer tgt_var)))) , And (Eq (Offset (Pointer tgt_var), offset), f)), h in
+      postcond, boogie_instrs)
     | 	Opcode.Trunc -> raise (Failure "Not implemented") 	(*	
     Cast Operators
       *)
@@ -137,7 +180,24 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         let postcond = Symbolicheap.And (Eq (Var tgt_var, term), f), h in
          postcond, boogie_instrs
         )
-    | 	Opcode.Call -> raise (Failure "Not implemented")
+    | 	Opcode.Call -> (
+      if is_malloc instr then (
+        let size = operand instr 0 |> extract_int_term in 
+        let new_bvar = Boogieir.generate_new_bvar bgraph in 
+        let tgt = extract_target instr in
+        let tgt_var = new_pvar ~v:tgt () in
+        let boogie_instrs = [
+          AAssign (boogie_avar_of_bvar new_bvar, boogie_avar_of_bvar new_bvar);
+          Assign (boogie_length_of_boogie_avar (boogie_avar_of_bvar new_bvar), boogie_term_of_int_term size);
+          Assign (boogie_var_of_pvar tgt_var, Int 0);          
+        ] in
+        let f, h = (quantify_out_pvar cond tgt_var) in
+        let post_f = Symbolicheap.And ((BlockEq ((Block (Pointer tgt_var)), (BVar new_bvar))), Symbolicheap.And (Eq (Offset (Pointer tgt_var), Int 0), f)) in
+        (post_f, (Heap.add (Array new_bvar) h)), boogie_instrs
+      ) else raise (Failure "Not implemented")
+
+    
+    )
     | 	Opcode.Select -> raise (Failure "Not implemented")
     | 	Opcode.UserOp1 -> raise (Failure "Not implemented")
     | 	Opcode.UserOp2 -> raise (Failure "Not implemented")
@@ -156,8 +216,8 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
 
 
 (* If Llvm basic block [weight] is executed from state [precondition], the output (postcondition, instrs) should be the post state [postcondition] and the equivalent translation in Boogie [instrs] *)
-let symbolic_update (src : LlvmNode.t) (precondition : symbolicheap) : symbolicheap * boogie_instr list = 
-  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond (LlvmNode.phi_num src) in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
+let symbolic_update (src : LlvmNode.t) (precondition : symbolicheap) (bgraph : BGraph.t) : symbolicheap * boogie_instr list = 
+  fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond (LlvmNode.phi_num src) bgraph in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
 
 (* Given a state [postcondition], computes most precise widening in finite class *)
 let widen (postcondition : symbolicheap) : symbolicheap = 
@@ -214,12 +274,14 @@ let gen_branch_condition (from : LlvmNode.t) (towards : LlvmNode.t) : formula =
 
 let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolicheap) : BGraph.t * BGNode.t = 
   (* For now, widening points will be computed via backedges *) 
+   let initial_node = ref None in 
    let rec go worklist bgraph edges = 
     if worklist = [] then bgraph, edges else (
       let (repeat_ct, node, precondition) = List.hd worklist in 
       let worklist = List.tl worklist in
-      let post, boogie_instrs = symbolic_update node precondition in 
+      let post, boogie_instrs = symbolic_update node precondition bgraph in 
       let (replacement_bnode : BGNode.t) = (repeat_ct, node, precondition, boogie_instrs) in 
+      if !initial_node = None then initial_node := Some replacement_bnode;
       let bgraph = BGraph.add_vertex bgraph replacement_bnode in
       let worklist, edges = LlvmGraph.fold_succ (fun succ (worklist, edges) ->
           let post_with_branch = Symbolicheap.And ((fst post), gen_branch_condition node succ), snd post in
@@ -244,11 +306,15 @@ let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolich
       in 
       let bgraph, edges = go [0, entry, precondition] BGraph.empty [] in 
 
+      let initial_node = match !initial_node with 
+        | Some node -> node
+        | None -> raise (Failure "No initial node found")
+    in
       BGraph.fold_vertex (fun bnode bgraph -> 
           let relevant_edges = List.filter (fun e -> let (_, (r, n), _) = e in let (r', n', _, _) = bnode in r = r' && LlvmNode.equal n n') edges in
           List.fold_left (fun bgraph (pred, _, rotation) -> 
               BGraph.add_edge_e bgraph (pred, gen_boogie_edge pred bnode rotation, bnode) 
             ) bgraph relevant_edges
       ) bgraph bgraph,
-      (0, entry, precondition, symbolic_update entry precondition |> snd)
+      initial_node
       

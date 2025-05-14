@@ -77,11 +77,13 @@ let duplicate_phi_nodes (g : LlvmGraph.t) : LlvmGraph.t =
 
 let generate_llvm_graph_from_ir m = 
   (* For now, we require that the input is a single function. *)
-  let func = fold_left_functions (fun acc func -> 
+  let funcs = fold_left_functions (fun acc func -> 
     match acc with 
     | [] -> [func]
-    | _ -> raise (Failure "Multiple functions in LLVM IR not supported.")
-  ) [] m |> List.hd in 
+    | _ -> print_string "Warning: multiple functions in LLVM IR. Only the first function will be used"; print_string (string_of_llvalue func); acc
+  ) [] m in
+  let func = List.hd funcs in 
+  print_string (string_of_llvalue func);
 
   let params = fold_left_params (fun acc param -> 
     let param_str = string_of_llvalue param in
@@ -111,3 +113,9 @@ let generate_llvm_graph_from_ir m =
   g, (0, 0, entry_block func), params
 
 let generate_llvm_graph c_file = generate_llvm_graph_from_ir (generate_llvm_ir c_file)
+
+let is_malloc (instr : llvalue) : bool = 
+  let instr_str = string_of_llvalue instr |> String.trim in
+  String.fold_left (fun acc c -> 
+    if acc = "" then acc else 
+    if c = (String.get acc 0) then String.sub acc 1 (String.length acc - 1) else "malloc") "malloc" instr_str = ""

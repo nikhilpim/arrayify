@@ -20,3 +20,5 @@ val generate_llvm_ir : string -> Llvm.llmodule
 val generate_llvm_graph_from_ir : Llvm.llmodule -> Graph.Persistent.Digraph.Concrete(LlvmNode).t * LlvmNode.t * (all_var list)
 val generate_llvm_graph : string -> Graph.Persistent.Digraph.Concrete(LlvmNode).t * LlvmNode.t * (all_var list)
 val print_llvm_block : Llvm.llbasicblock -> unit
+
+val is_malloc : Llvm.llvalue -> bool

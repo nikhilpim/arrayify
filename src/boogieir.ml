@@ -38,7 +38,6 @@ type boogie_instr =
 | Return of boogie_var
 | Error
 
-
 module BGNode = struct 
   type t = int * Llvmutil.LlvmNode.t * symbolicheap * boogie_instr list
   let hash = Hashtbl.hash 
@@ -189,3 +188,6 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
   let procedure = "procedure main("^parameter_string^") \n" ^ returns_statement ^ modifies_statement ^ "{\n" ^ procedure_body ^ "}\n" in
 
   array_initialization ^ procedure
+
+let generate_new_bvar (graph : BGraph.t) : Variable.bvar = 
+  generate_new_bvar (get_avars graph)

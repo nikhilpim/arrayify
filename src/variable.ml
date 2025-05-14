@@ -31,3 +31,7 @@ let new_bvar ?(v : int =0) (): bvar = v
 
 let prime_var v : var = v^"'"
 let prime_pvar v : var = v^"'"
+
+let generate_new_bvar (ls : boogie_avar list) : bvar = 
+  let max_bvar = List.fold_left (fun acc a -> if a > acc then a else acc) 0 ls in
+  max_bvar + 1

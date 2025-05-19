@@ -49,9 +49,9 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     Not an instruction
       *)
     | 	Opcode.Ret -> (
-      let var_name = string_of_llvalue instr |> String.trim |> String.split_on_char ' ' |> List.rev |> List.hd in
+      let term = operand instr 0 |> extract_int_term in
       let boogie_instrs = [
-        Return (boogie_var_of_var (new_var ~v:var_name ()));
+        Return (boogie_term_of_int_term term);
       ]  in 
       cond, boogie_instrs
     ) (*	

@@ -35,7 +35,7 @@ type boogie_instr =
 | Assume of boogie_formula 
 | Assert of boogie_formula 
 | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term 
-| Return of boogie_var
+| Return of boogie_term
 | Error
 
 module BGNode = struct 
@@ -111,7 +111,7 @@ let get_vars (g : BGraph.t) : boogie_var list =
     | Assume _ -> acc
     | Assert _ -> acc
     | IteAssign (v, _, t1, t2) -> fold_bt t1 (fold_bt t2 (BoVarSet.add v acc))
-    | Return v -> BoVarSet.add v acc
+    | Return t -> fold_bt t acc
     | Error -> acc
   ) acc ops) g BoVarSet.empty
   |> BoVarSet.elements
@@ -147,7 +147,7 @@ let boogie_instr_text (boogie_instr : boogie_instr) : string =
     let t2_text = bt_text t2 in 
     let f_text = bf_text f in 
     "if ("^f_text^") {\n"^v_text^" := "^t1_text^";\n} else {\n"^v_text^" := "^t2_text^";\n}\n"
-  | Return v -> "retval := "^boogie_var_name v^";\n"
+  | Return v -> "retval := "^bt_text v^";\n"
   | Error -> "error;\n"
 
 let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var list): string = 

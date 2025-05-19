@@ -24,7 +24,7 @@ type boogie_instr =
 | Assume of boogie_formula 
 | Assert of boogie_formula 
 | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term 
-| Return of boogie_var
+| Return of boogie_term
 | Error
 
 module BGNode : sig

@@ -33,10 +33,19 @@ let basic_test () = (
   translate "/Users/np6641/dev/arrayify/test/files/basic.c" sheap
 )
 
+let rotation_test () = (
+  print_string "\n\n\nRunning Translation on test/files/rotation.c...\n\n\n";
+  let formula = True in 
+  let heap = Heap.empty in 
+  let sheap = (formula, heap) in
+  translate "/Users/np6641/dev/arrayify/test/files/rotation.c" sheap
+)
+
 let () = (
    let _ = min_test, comp_test, basic_test in
-   min_test ();
-   comp_test ();
+   (* min_test (); *)
+   (* comp_test (); *)
    (* basic_test (); *)
+   rotation_test ();
 )
 

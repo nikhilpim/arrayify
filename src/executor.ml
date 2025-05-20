@@ -238,6 +238,7 @@ let widen (f, h : symbolicheap) : symbolicheap =
 
 (* Checks if [from] entails [towards] up to arbitrary permutation of the block variables. Returns None if not, or otherwise Some (to, instrs) where instrs encodes the permutation in Boogie *)
 let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) : (boogie_instr list) option = 
+  if not (sheap_equals towards (widen towards)) then None else
   let from_peqs = pointer_equalities from in
   let towards_peqs = pointer_equalities towards in
   let rotation = List.fold_left (fun acc (p, b) -> 

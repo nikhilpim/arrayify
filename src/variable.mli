@@ -13,7 +13,11 @@ val boogie_var_of_pvar : pvar -> boogie_var
 val boogie_avar_of_bvar : bvar -> boogie_avar
 val boogie_length_of_boogie_avar : boogie_avar -> boogie_var 
 
+
+val var_name : var -> string
 val pvar_name : pvar -> string
+val bvar_name : bvar -> string
+
 val boogie_var_name : boogie_var -> string
 val boogie_avar_name : boogie_avar -> string
 val boogie_avar_input_name : boogie_avar -> string

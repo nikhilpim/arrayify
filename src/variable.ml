@@ -14,7 +14,10 @@ let boogie_var_of_pvar (p: pvar) : boogie_var = p
 let boogie_avar_of_bvar (b : bvar) : boogie_avar = b
 let boogie_length_of_boogie_avar (b : boogie_avar) : boogie_var = "length"^string_of_int b
 
+let var_name (v : var) : string = "v_"^v
 let pvar_name (p : pvar) : string = "p_"^p
+let bvar_name (b : bvar) : string = "b_"^string_of_int b
+
 let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'v' else c) b
 let boogie_avar_name (b : boogie_avar) : string = "a"^string_of_int b
 let boogie_avar_input_name (b : boogie_avar) : string = "a"^string_of_int b^"_input"
@@ -35,4 +38,6 @@ let prime_pvar v : var = v^"'"
 
 let generate_new_bvar (ls : boogie_avar list) : bvar = 
   let max_bvar = List.fold_left (fun acc a -> if a > acc then a else acc) 0 ls in
-  max_bvar + 1
+  let ret = if !Global.max_malloc > max_bvar then !Global.max_malloc else max_bvar in
+  Global.max_malloc := ret + 1;
+  !Global.max_malloc

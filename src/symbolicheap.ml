@@ -130,21 +130,20 @@ let sheap_equals (f1, h1) (f2, h2) = Heap.equal h1 h2 && (f1 = f2 || (
 
 let sheap_single_b (f, h : symbolicheap) (p : pvar) : bvar option = 
   let s = formula_to_syntaxformula Global.srk f in 
-  match Heap.find_first_opt (fun e -> 
+  Heap.fold (fun e acc -> 
     match e with 
     | Array b -> (
-      let b = Variable.bvar_to_svar b in 
+      let b_svar = Variable.bvar_to_svar b in 
       let p = Variable.pvarblock_to_svar p in 
-      let eq = Syntax.mk_eq Global.srk b p in
+      let eq = Syntax.mk_eq Global.srk b_svar p in
       reset Global.solver; add Global.solver [s; Syntax.mk_not Global.srk eq];
       match check Global.solver with 
-      | `Sat -> false
-      | `Unsat -> true
-      | `Unknown -> raise (Failure "Unknown equivalence from Z3"))
-    | _ -> false
-    ) h with 
-  | Some (Array b) -> Some b
-  | _ -> None
+      | `Sat -> acc
+      | `Unsat -> Some b
+      | `Unknown -> raise (Failure "Unknown equivalence from Z3")
+    )
+    | _ -> acc
+  ) h None
 
 let all_pvars f : pvar list = 
   let rec go f acc = 

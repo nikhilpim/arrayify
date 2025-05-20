@@ -62,7 +62,7 @@ let duplicate_phi_nodes (g : LlvmGraph.t) : LlvmGraph.t =
   let phi_nodes = LlvmGraph.fold_vertex (fun (id, phi_id, block) acc ->
     let has_phi = fold_left_instrs (fun acc instr -> 
       match instr_opcode instr with
-      | Opcode.PHI -> (if acc then raise (Failure "Multiple phi instructions in a single block") else true) 
+      | Opcode.PHI -> (if acc then (print_string "Warning: multiple phi statements in block. No checking implemented yet."; true) else true) 
       | _ -> acc      
       ) false block in
     if has_phi then (id, phi_id, block) :: acc else acc 

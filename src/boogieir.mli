@@ -24,6 +24,7 @@ type boogie_instr =
 | Assume of boogie_formula 
 | Assert of boogie_formula 
 | IteAssign of boogie_var * boogie_formula * boogie_term * boogie_term 
+| Rotate of (boogie_avar * boogie_avar) list
 | Return of boogie_term
 | Error
 

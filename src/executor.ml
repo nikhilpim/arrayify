@@ -237,9 +237,21 @@ let widen (f, h : symbolicheap) : symbolicheap =
   f', h'
 
 (* Checks if [from] entails [towards] up to arbitrary permutation of the block variables. Returns None if not, or otherwise Some (to, instrs) where instrs encodes the permutation in Boogie *)
-let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) (_recipient : BGNode.t): (BGNode.t * boogie_instr list) option = 
-  let _ = (from, towards) in 
-  raise (Failure "Not implemented")
+let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) : (boogie_instr list) option = 
+  let from_peqs = pointer_equalities from in
+  let towards_peqs = pointer_equalities towards in
+  let rotation = List.fold_left (fun acc (p, b) -> 
+    match acc with 
+    | Some instrs -> (
+      match List.assoc_opt p from_peqs with 
+      | Some b' -> Some (if (b = b') then instrs else ((boogie_avar_of_bvar b', boogie_avar_of_bvar b) :: instrs))
+      | None -> None
+    ) 
+    | None -> None
+    ) (Some []) towards_peqs in 
+  match rotation with 
+  | Some ls -> Some [Rotate ls]
+  | None -> None
 
 let gen_boogie_edge (from : BGNode.t) (towards : BGNode.t) (rotation : boogie_instr list option) : BGEdge.t = 
   let (_, from_node, _, _) = from in 
@@ -308,7 +320,11 @@ let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolich
               let (_, previous_node, previous_cond, _) = previous_bnode in 
               match (find, LlvmNode.equal previous_node succ) with 
               | (Some _), _ | _, false -> find 
-              | None, true -> check_rotate_entails widened_postcondition previous_cond previous_bnode) bgraph None in 
+              | None, true -> 
+                match check_rotate_entails widened_postcondition previous_cond with 
+                | Some rot -> Some (previous_bnode, rot)
+                | None -> None
+                ) bgraph None in 
             match exists_covering_vertex with 
               | None -> (new_repeat_ct, succ, widened_postcondition) :: worklist, (replacement_bnode, (new_repeat_ct, succ), None) :: edges
               | Some ((r, n, _, _), rotation) -> worklist, (replacement_bnode, (r, n), Some rotation) :: edges 

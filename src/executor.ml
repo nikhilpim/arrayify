@@ -229,9 +229,12 @@ let symbolic_update (src : LlvmNode.t) (precondition : symbolicheap) (bgraph : B
   fold_left_instrs (fun (cond, blist) instr -> let post, boogie_translation = symbolic_update_instr instr cond (LlvmNode.phi_num src) bgraph in post, (blist @ boogie_translation)) (precondition, []) (LlvmNode.llvm_block src) 
 
 (* Given a state [postcondition], computes most precise widening in finite class *)
-let widen (postcondition : symbolicheap) : symbolicheap = 
-  let _ = postcondition in 
-  raise (Failure "Not implemented")
+let widen (f, h : symbolicheap) : symbolicheap = 
+  let peqs = pointer_equalities (f, h) in
+  let f' = List.fold_left (fun acc (p, b) -> Symbolicheap.And (Symbolicheap.BlockEq ((Block (Pointer p)), (BVar b)), acc)) Symbolicheap.True peqs in
+  let h' = List.fold_left (fun acc (_, b) -> Heap.add (Array b) acc) Heap.empty peqs in 
+  let h' = if Heap.exists (fun e -> not (Heap.mem e h')) h then (Heap.add TrueHeap h') else (h') in 
+  f', h'
 
 (* Checks if [from] entails [towards] up to arbitrary permutation of the block variables. Returns None if not, or otherwise Some (to, instrs) where instrs encodes the permutation in Boogie *)
 let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) (_recipient : BGNode.t): (BGNode.t * boogie_instr list) option = 
@@ -292,11 +295,14 @@ let execute (entry : LlvmNode.t) (graph : LlvmGraph.t) (precondition : symbolich
       let (replacement_bnode : BGNode.t) = (repeat_ct, node, precondition, boogie_instrs) in 
       if !initial_node = None then initial_node := Some replacement_bnode;
       let bgraph = BGraph.add_vertex bgraph replacement_bnode in
+      print_string ("Popping node "^(LlvmNode.name node)^" off worklist\n");
       let worklist, edges = LlvmGraph.fold_succ (fun succ (worklist, edges) ->
+        print_string ("Considering edge to "^(LlvmNode.name succ)^"\n");
           let post_with_branch = Symbolicheap.And ((fst post), gen_branch_condition node succ), snd post in
           let new_repeat_ct = BGraph.fold_vertex (fun (r, l, _, _) m -> if LlvmNode.equal l succ then max m (r + 1) else m) bgraph (0) in
           let new_repeat_ct = List.fold_left (fun m (r, l, _) -> if LlvmNode.equal l succ then max m (r + 1) else m) new_repeat_ct worklist in
           if (LlvmNode.compare succ node < 0) then (
+            print_string ("Found backedge from "^(LlvmNode.name node)^" to "^(LlvmNode.name succ)^"\n");
             let widened_postcondition = widen post_with_branch in
             let exists_covering_vertex = BGraph.fold_vertex (fun previous_bnode find -> 
               let (_, previous_node, previous_cond, _) = previous_bnode in 

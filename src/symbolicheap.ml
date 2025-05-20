@@ -104,6 +104,43 @@ let sheap_single_b (f, h : symbolicheap) (p : pvar) : bvar option =
   | Some (Array b) -> Some b
   | _ -> None
 
+let all_pvars f : pvar list = 
+  let rec go f acc = 
+    match f with 
+    | True -> acc
+    | Leq (t1, t2) -> go_term t1 (go_term t2 acc)
+    | Eq (t1, t2) -> go_term t1 (go_term t2 acc)
+    | BlockEq (b1, b2) -> go_block b1 (go_block b2 acc)
+    | And (f1, f2) -> go f1 (go f2 acc)
+    | Or (f1, f2) -> go f1 (go f2 acc)
+    | Not f1 -> go f1 acc
+  and go_block b acc = 
+    match b with 
+    | Block p -> go_pointer_term p acc
+    | BVar _ -> acc
+  and go_term t acc =
+    match t with 
+    | Int _ -> acc
+    | Var _ -> acc
+    | Times (_, t) -> go_term t acc
+    | Sum (t1, t2) -> go_term t1 (go_term t2 acc)
+    | PSub (p1, p2) -> go_pointer_term p1 (go_pointer_term p2 acc)
+    | Offset p -> go_pointer_term p acc
+  and go_pointer_term p acc =
+    match p with 
+    | Pointer p -> p :: acc
+    | PointerSum (p, t) -> go_pointer_term p (go_term t acc)
+  in 
+  let with_repeats = go f [] in 
+  List.fold_left (fun acc p -> if List.mem p acc then acc else p :: acc) [] with_repeats 
+
+let pointer_equalities (f, h : symbolicheap) : (pvar * bvar) list = 
+  let all_pvars = all_pvars f in
+  List.fold_left (fun acc p -> match sheap_single_b (f, h) p with 
+  | Some b -> (p, b) :: acc
+  | None -> acc
+  ) [] all_pvars
+
 let quantify_out_var (f, h : symbolicheap) (v : var) : symbolicheap = 
   let rec quantify_out_int_term it v_name = 
     match it with 

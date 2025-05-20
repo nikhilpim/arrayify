@@ -32,5 +32,7 @@ val empty_sheap : symbolicheap
 val sheap_equals : symbolicheap -> symbolicheap -> bool
 val sheap_single_b : symbolicheap -> pvar -> bvar option 
 
+val pointer_equalities : symbolicheap -> (pvar * bvar) list
+
 val quantify_out_var : symbolicheap -> var -> symbolicheap
 val quantify_out_pvar : symbolicheap -> pvar -> symbolicheap

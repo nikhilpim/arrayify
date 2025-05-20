@@ -70,7 +70,8 @@ let duplicate_phi_nodes (g : LlvmGraph.t) : LlvmGraph.t =
   List.fold_left (fun g phi_node ->
     let with_new_edges, _ = LlvmGraph.fold_pred (fun pred (g, phi_id) ->
         let id, _, block = phi_node in 
-        LlvmGraph.add_edge g pred (id, phi_id, block), phi_id + 1
+        let with_out_edges = LlvmGraph.fold_succ (fun succ g -> LlvmGraph.add_edge g (id, phi_id, block) succ) g phi_node g in 
+        LlvmGraph.add_edge with_out_edges pred (id, phi_id, block), phi_id + 1
       ) g phi_node (g, 1) in 
       LlvmGraph.remove_vertex with_new_edges phi_node
     ) g phi_nodes
@@ -83,7 +84,6 @@ let generate_llvm_graph_from_ir m =
     | _ -> print_string "Warning: multiple functions in LLVM IR. Only the first function will be used"; print_string (string_of_llvalue func); acc
   ) [] m in
   let func = List.hd funcs in 
-  print_string (string_of_llvalue func);
 
   let params = fold_left_params (fun acc param -> 
     let param_str = string_of_llvalue param in

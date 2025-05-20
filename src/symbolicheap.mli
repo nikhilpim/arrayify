@@ -25,7 +25,7 @@ type formula =
 
 
 type symbolicheap = formula * Set.Make(HeapElem).t
-
+val string_of_symbolicheap : symbolicheap -> string
 val true_sheap : symbolicheap
 
 val empty_sheap : symbolicheap

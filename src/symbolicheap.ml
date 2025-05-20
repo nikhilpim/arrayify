@@ -31,6 +31,48 @@ type symbolicheap = formula * Heap.t
 
 let true_sheap = (True, Heap.singleton TrueHeap)
 
+let rec string_of_int_term t =
+  let rec aux t =
+    match t with
+    | Int i -> string_of_int i
+    | Var v -> Variable.var_name v
+    | Times (i, t) -> Printf.sprintf "%d * (%s)" i (aux t)
+    | Sum (t1, t2) -> Printf.sprintf "(%s + %s)" (aux t1) (aux t2)
+    | PSub (p1, p2) -> Printf.sprintf "(%s - %s)" (string_of_pointer_term p1) (string_of_pointer_term p2)
+    | Offset p -> Printf.sprintf "Offset(%s)" (string_of_pointer_term p)
+  in
+  aux t
+and string_of_pointer_term p =
+  match p with
+  | Pointer p -> pvar_name p
+  | PointerSum (p, t) -> Printf.sprintf "(%s + %s)" (string_of_pointer_term p) (string_of_int_term t)
+
+let string_of_block b =
+  match b with
+  | Block p -> Printf.sprintf "Block(%s)" (string_of_pointer_term p)
+  | BVar b -> Variable.bvar_name b
+
+let rec string_of_formula f =
+  match f with
+  | True -> "True"
+  | Leq (t1, t2) -> Printf.sprintf "(%s <= %s)" (string_of_int_term t1) (string_of_int_term t2)
+  | Eq (t1, t2) -> Printf.sprintf "(%s = %s)" (string_of_int_term t1) (string_of_int_term t2)
+  | BlockEq (b1, b2) -> Printf.sprintf "(%s = %s)" (string_of_block b1) (string_of_block b2)
+  | And (f1, f2) -> Printf.sprintf "(%s AND %s)" (string_of_formula f1) (string_of_formula f2)
+  | Or (f1, f2) -> Printf.sprintf "(%s OR %s)" (string_of_formula f1) (string_of_formula f2)
+  | Not f1 -> Printf.sprintf "NOT(%s)" (string_of_formula f1)
+
+let string_of_heap h =
+  let elems = Heap.elements h in
+  let elem_strings = List.map (function
+    | HeapElem.Array b -> Printf.sprintf "Array(%s)" (Variable.bvar_name b)
+    | HeapElem.TrueHeap -> "TrueHeap"
+  ) elems in
+  Printf.sprintf "{%s}" (String.concat ", " elem_strings)
+
+let string_of_symbolicheap (f, h) =
+  Printf.sprintf "Formula: %s\nHeap: %s" (string_of_formula f) (string_of_heap h)
+
 let rec int_term_to_syntaxterm srk t = 
   match t with 
   | Int i -> Syntax.mk_int srk i

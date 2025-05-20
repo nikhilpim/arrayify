@@ -16,6 +16,7 @@ val boogie_length_of_boogie_avar : boogie_avar -> boogie_var
 val pvar_name : pvar -> string
 val boogie_var_name : boogie_var -> string
 val boogie_avar_name : boogie_avar -> string
+val boogie_avar_input_name : boogie_avar -> string
 val boogie_avar_local_name : boogie_avar -> string
 
 val var_to_svar : var -> Global.Ctx.t Srkmin.Syntax.arith_term

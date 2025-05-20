@@ -43,6 +43,6 @@ end
 val boogie_term_of_int_term : int_term -> boogie_term 
 val boogie_term_of_pointer_term : pointer_term -> boogie_term
 
-val code_of_boogie_graph : BGNode.t -> Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> boogie_var list -> string
+val code_of_boogie_graph : BGNode.t -> Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> boogie_var list -> boogie_avar list -> string
 
 val generate_new_bvar : Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> Variable.bvar

@@ -49,6 +49,9 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     Not an instruction
       *)
     | 	Opcode.Ret -> (
+      if num_operands instr = 0 then 
+        cond, []
+    else 
       let term = operand instr 0 |> extract_int_term in
       let boogie_instrs = [
         Return (boogie_term_of_int_term term);

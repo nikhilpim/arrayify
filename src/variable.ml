@@ -17,6 +17,7 @@ let boogie_length_of_boogie_avar (b : boogie_avar) : boogie_var = "length"^strin
 let pvar_name (p : pvar) : string = "p_"^p
 let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'v' else c) b
 let boogie_avar_name (b : boogie_avar) : string = "a"^string_of_int b
+let boogie_avar_input_name (b : boogie_avar) : string = "a"^string_of_int b^"_input"
 let boogie_avar_local_name (b : boogie_avar) : string = "a"^string_of_int b^"_local"
 
 

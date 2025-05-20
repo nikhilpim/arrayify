@@ -154,7 +154,7 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
   let returns_statement = "returns ("^(List.fold_left (fun acc a -> (boogie_avar_name a^" : [int]int") :: acc) ["retval : int"] array_params |> String.concat ", ")^")\n" in 
   let params = params @ (List.map boogie_length_of_boogie_avar array_params) in
 
-  let avars = get_avars g in
+  let avars = get_avars g |>  List.filter (fun e -> not ( List.mem e array_params))in
   let vars = get_vars g |> List.filter (fun e -> not ( List.mem e params)) in 
   let var_declarations = List.fold_left (fun acc v -> "var "^(boogie_var_name v)^" : int;\n" ^ acc) "" vars 
       ^ (List.fold_left (fun acc a -> 

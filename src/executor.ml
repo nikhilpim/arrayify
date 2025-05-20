@@ -197,7 +197,13 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         let f, h = (quantify_out_pvar cond tgt_var) in
         let post_f = Symbolicheap.And ((BlockEq ((Block (Pointer tgt_var)), (BVar new_bvar))), Symbolicheap.And (Eq (Offset (Pointer tgt_var), Int 0), f)) in
         (post_f, (Heap.add (Array new_bvar) h)), boogie_instrs
-      ) else raise (Failure "Not implemented")
+      ) else if is_free instr then (
+         let pointer = operand instr 0 |> extract_pointer in
+         match sheap_single_b cond pointer with
+         | Some b -> (let f, h = cond in (f, Heap.remove (Array b) h), [])
+         | None -> (cond, [Assert (Not (True))]) (* assert false because we're freeing a pointer that is not pointing to a single heap element*)      
+      )  
+      else raise (Failure "Not implemented")
 
     
     )

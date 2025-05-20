@@ -22,3 +22,4 @@ val generate_llvm_graph : string -> Graph.Persistent.Digraph.Concrete(LlvmNode).
 val print_llvm_block : Llvm.llbasicblock -> unit
 
 val is_malloc : Llvm.llvalue -> bool
+val is_free : Llvm.llvalue -> bool

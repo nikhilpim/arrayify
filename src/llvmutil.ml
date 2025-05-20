@@ -114,8 +114,15 @@ let generate_llvm_graph_from_ir m =
 
 let generate_llvm_graph c_file = generate_llvm_graph_from_ir (generate_llvm_ir c_file)
 
-let is_malloc (instr : llvalue) : bool = 
-  let instr_str = string_of_llvalue instr |> String.trim in
+let string_contains str contains = 
   String.fold_left (fun acc c -> 
     if acc = "" then acc else 
-    if c = (String.get acc 0) then String.sub acc 1 (String.length acc - 1) else "malloc") "malloc" instr_str = ""
+    if c = (String.get acc 0) then String.sub acc 1 (String.length acc - 1) else contains) contains str = ""
+
+let is_malloc (instr : llvalue) : bool = 
+  let instr_str = string_of_llvalue instr |> String.trim in
+  string_contains instr_str "malloc"
+
+let is_free (instr : llvalue) : bool = 
+  let instr_str = string_of_llvalue instr |> String.trim in
+  string_contains instr_str "free"

@@ -268,7 +268,12 @@ let check_rotate_entails (from : symbolicheap) (towards : symbolicheap) : (boogi
     | None -> None
     ) (Some []) towards_peqs in 
   match rotation with 
-  | Some ls -> Some [Rotate ls]
+  | Some ls -> 
+    let dedup, err = List.fold_left (fun (acc, err) (from, towards) -> 
+      match List.assoc_opt from acc with 
+      | Some towards' -> if towards = towards' then acc, err else acc, true
+      | None -> (from, towards) :: acc, err) ([], false) ls in 
+      if err then None else Some [Rotate dedup]
   | None -> None
 
 let gen_boogie_edge (from : BGNode.t) (towards : BGNode.t) (rotation : boogie_instr list option) : BGEdge.t = 

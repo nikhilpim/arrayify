@@ -173,6 +173,9 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
       *)
     | 	Opcode.FCmp -> raise (Failure "Not implemented")
     | 	Opcode.PHI -> (
+        let tokens = string_of_llvalue instr |> String.trim |> String.split_on_char ' ' in 
+        let type_defn = List.nth tokens 3 in 
+        if type_defn = "i32" then (
         let term = operand instr (phi_num - 1) |> extract_int_term in 
         let tgt = extract_target instr in
         let tgt_var = new_var ~v:tgt () in
@@ -181,7 +184,21 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         ]  in 
         let f, h = (quantify_out_var cond tgt_var) in
         let postcond = Symbolicheap.And (Eq (Var tgt_var, term), f), h in
-         postcond, boogie_instrs
+         postcond, boogie_instrs) 
+        else if type_defn = "ptr" then (
+          let ptr = operand instr (phi_num - 1) |> extract_pointer in 
+          let tgt = extract_target instr in 
+          let tgt_ptr = new_pvar ~v:tgt () in 
+          let boogie_instrs = [
+            Assign (boogie_var_of_pvar tgt_ptr, boogie_term_of_pointer_term (Pointer ptr))
+          ] in 
+          let f, h = (quantify_out_pvar cond tgt_ptr) in
+          let postcond = Symbolicheap.And (
+            Symbolicheap.And (
+              BlockEq (Block (Pointer ptr), Block (Pointer tgt_ptr)),
+              Eq (Offset (Pointer ptr), Offset (Pointer tgt_ptr))), f), h in 
+          postcond, boogie_instrs
+        ) else (raise (Failure "unknown phi type defn"))
         )
     | 	Opcode.Call -> (
       if is_malloc instr then (

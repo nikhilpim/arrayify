@@ -161,7 +161,7 @@ let boogie_instr_text (boogie_instr : boogie_instr) : string =
     "if ("^f_text^") {\n"^v_text^" := "^t1_text^";\n} else {\n"^v_text^" := "^t2_text^";\n}\n"
   | Rotate ls -> (
       let local_store = (List.map (fun (from, _) -> (boogie_avar_local_name from)^" := "^(boogie_avar_name from)^";\n") ls |> String.concat "") in 
-      let rotate = (List.map (fun (from, towards) -> (boogie_avar_name towards)^" := "^(boogie_avar_local_name from)^";n") ls |> String.concat "") in 
+      let rotate = (List.map (fun (from, towards) -> (boogie_avar_name towards)^" := "^(boogie_avar_local_name from)^";\n") ls |> String.concat "") in 
       local_store ^ rotate
   )
   | Return v -> "retval := "^bt_text v^";\n"

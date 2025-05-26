@@ -6,8 +6,9 @@ void f(int count) {
     while (count > 0) {
         count --;
         next = malloc (2 * sizeof(int));
-        free(curr);
+        next[0] = 2;
+        // free(curr);
         curr = next;
     }
     curr[0] = 1;
-}
+} 

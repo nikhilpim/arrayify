@@ -42,7 +42,7 @@ let rotation_test () = (
 )
 
 let () = (
-   let _ = min_test, comp_test, basic_test in
+   let _ = min_test, comp_test, basic_test, rotation_test in
    (* min_test (); *)
    (* comp_test (); *)
    (* basic_test (); *)

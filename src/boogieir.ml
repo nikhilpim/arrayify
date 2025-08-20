@@ -138,13 +138,23 @@ let rec bt_text (t : boogie_term) : string =
   | Not f1 -> "!("^(bf_text f1)^")"
 
 let local_array_uses (g : BGraph.t) : boogie_avar list = 
-  BGraph.fold_vertex (fun (_, _, _, ops) acc -> 
+  (BGraph.fold_vertex (fun (_, _, _, ops) acc -> 
     List.fold_left (fun acc instr -> 
       match instr with 
       | Rotate ls -> List.fold_left (fun acc (from, _) -> BoAvarSet.add from acc) acc ls
       | _ -> acc
       ) acc ops) g BoAvarSet.empty
-  |> BoAvarSet.elements
+  |> BoAvarSet.elements) @ 
+  (BGraph.fold_edges_e (fun (_, (_, rotation), _) acc -> 
+    match rotation with 
+    | None -> acc
+    | Some instrs -> 
+      List.fold_left (fun acc instr -> 
+        match instr with 
+        | Rotate ls -> List.fold_left (fun acc (from, _) -> BoAvarSet.add from acc) acc ls
+        | _ -> acc
+      ) acc instrs
+    ) g BoAvarSet.empty |> BoAvarSet.elements)
 
 let boogie_instr_text (boogie_instr : boogie_instr) : string = 
   match boogie_instr with 

@@ -23,6 +23,12 @@ let extract_int_term (v : llvalue) : int_term =
     if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
       else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
     ) else 
+  if ((String.sub s 0 3) = "i8 ") then 
+    (
+    let value_str = String.sub s 3 (String.length s - 3) in
+    if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
+      else Int (String.sub s 3 (String.length s - 3) |> int_of_string)
+    ) else
   if (String.get s 0 = '%') then (
       let var_name = s |> String.trim |> String.split_on_char ' ' |> List.hd in
       let var = new_var ~v:var_name () in

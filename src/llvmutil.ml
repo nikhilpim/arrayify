@@ -51,6 +51,19 @@ let generate_llvm_ir c_file =
   let opt_command = Printf.sprintf "opt -passes mem2reg -S %s -o %s" llvm_ir_file_unoptimized llvm_ir_file_optimized in
   let _ = Sys.command clang_command in
   let _ = Sys.command opt_command in
+
+  (* HACKY: Homebrew clang sometimes emits malformed LLVM IR files, 
+      placing the nuw (no unsigned wrap) keyword in the getelementptr instruction 
+      when nuw should only be used for integer arithmetic instructions.
+      We solve this by deleting the nuw keyword. This doesn't affect our 
+      translation because we don't consider integer wrapping in our translation in any case
+  *)
+  let content = In_channel.with_open_bin llvm_ir_file_optimized In_channel.input_all in
+  let content' = Str.global_replace (Str.regexp "getelementptr inbounds nuw ") "getelementptr inbounds " content in
+  Out_channel.with_open_bin llvm_ir_file_optimized (fun oc ->
+      Out_channel.output_string oc content'
+    );
+
   let mem_buffer = MemoryBuffer.of_file llvm_ir_file_optimized in
   parse_ir ctx mem_buffer
 

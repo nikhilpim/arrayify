@@ -104,7 +104,24 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.Alloca  -> raise (Failure "Not implemented")	(*	
     Memory Operators
       *)
-    | 	Opcode.Load -> raise (Failure "Not implemented")
+    | 	Opcode.Load -> (
+      let pointer = operand instr 0 |> extract_pointer in
+      let tgt = extract_target instr in
+      let tgt_var = new_var ~v:tgt () in
+      match sheap_single_b cond pointer with 
+      | Some b -> (
+        let boogie_instrs = [
+                        Assert (Leq (Int 0, Var (boogie_var_of_pvar pointer))); 
+                        Assert (Leq (Var (boogie_var_of_pvar pointer), Var (boogie_length_of_boogie_avar (boogie_avar_of_bvar b)))); 
+                        Assign ((boogie_var_of_var tgt_var), (Read ((boogie_avar_of_bvar b),(Var (boogie_var_of_pvar pointer)))))
+                      ] in 
+                        cond, boogie_instrs
+      )
+      | None -> (
+        let boogie_instrs = [ Assert (Not (True))] in 
+                      true_sheap, boogie_instrs
+      )
+    )
     | 	Opcode.Store -> (let value = operand instr 0 |> extract_int_term in 
                     let pointer_pvar = extract_pointer (operand instr 1) in 
                     match sheap_single_b cond pointer_pvar with 

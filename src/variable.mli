@@ -28,9 +28,10 @@ val pvarblock_to_svar : pvar -> Global.Ctx.t Srkmin.Syntax.arith_term
 val pvaroffset_to_svar : pvar -> Global.Ctx.t Srkmin.Syntax.arith_term
 val bvar_to_svar : bvar -> Global.Ctx.t Srkmin.Syntax.arith_term
 
-val new_var : ?v:string -> unit -> var
-val new_pvar : ?v:string -> unit -> pvar
-val new_bvar : ?v:int -> unit -> bvar
+val new_var : string -> var
+val new_pvar : string -> pvar
+val new_bvar : int -> bvar
+val new_avar : string -> boogie_avar
 
 val prime_var : var -> var
 val prime_pvar : pvar -> pvar

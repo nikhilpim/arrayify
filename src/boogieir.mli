@@ -41,9 +41,12 @@ module BGEdge : sig
   val default : t
 end
 
+module BGraph : module type of Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
+
 val boogie_term_of_int_term : int_term -> boogie_term 
 val boogie_term_of_pointer_term : pointer_term -> boogie_term
 val boogie_instr_text : boogie_instr -> string
-val code_of_boogie_graph : BGNode.t -> Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> boogie_var list -> boogie_avar list -> string
+val code_of_boogie_graph : BGNode.t -> BGraph.t -> boogie_var list -> boogie_avar list -> string
 
-val generate_new_bvar : Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge).t -> Variable.bvar
+val generate_new_bvar : BGraph.t -> Variable.bvar
+val build_graph : (string * string list * string list * boogie_instr list) list -> BGraph.t

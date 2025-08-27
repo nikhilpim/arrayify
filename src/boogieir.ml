@@ -68,7 +68,8 @@ and boogie_term_of_int_term (t: int_term) =
   | Int i -> Int i
   | Var v -> Var (boogie_var_of_var v)
   | Times (i, t) -> Times (i, boogie_term_of_int_term t)
-  | Sum (t1, t2) -> Sum (boogie_term_of_int_term t1, boogie_term_of_int_term t2)
+  | Add (t1, t2) -> Sum (boogie_term_of_int_term t1, boogie_term_of_int_term t2)
+  | Sub (t1, t2) -> Sum (boogie_term_of_int_term t1, Times (-1, boogie_term_of_int_term t2))
   | Offset p -> boogie_term_of_pointer_term p
   | PSub (p1, p2) -> Sum (boogie_term_of_pointer_term p1, (Times (-1, boogie_term_of_pointer_term p2)))
   
@@ -225,3 +226,7 @@ let code_of_boogie_graph (entry : BGNode.t) (g : BGraph.t) (params : boogie_var 
 
 let generate_new_bvar (graph : BGraph.t) : Variable.bvar = 
   generate_new_bvar (get_avars graph)
+
+
+let build_graph (_procedures : (string * string list * string list * boogie_instr list) list) : BGraph.t =
+  failwith "Not yet implemented"

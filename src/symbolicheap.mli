@@ -4,7 +4,8 @@ type int_term =
     Int of int
   | Var of var
   | Times of int * int_term
-  | Sum of int_term * int_term
+  | Add of int_term * int_term
+  | Sub of int_term * int_term
   | PSub of pointer_term * pointer_term
   | Offset of pointer_term
 and pointer_term = Pointer of pvar | PointerSum of pointer_term * int_term
@@ -36,3 +37,5 @@ val pointer_equalities : symbolicheap -> (pvar * bvar) list
 
 val quantify_out_var : symbolicheap -> var -> symbolicheap
 val quantify_out_pvar : symbolicheap -> pvar -> symbolicheap
+
+val pt_eq : pointer_term -> pointer_term -> formula

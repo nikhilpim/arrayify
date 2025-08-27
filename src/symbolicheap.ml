@@ -6,8 +6,8 @@ type int_term =
     Int of int
   | Var of var
   | Times of int * int_term
-  | Sum of int_term * int_term
-  | PSub of pointer_term * pointer_term
+  | Add of int_term * int_term
+  | Sub of int_term * int_term  | PSub of pointer_term * pointer_term
   | Offset of pointer_term
 and pointer_term = Pointer of pvar | PointerSum of pointer_term * int_term
 type block = Block of pointer_term | BVar of bvar
@@ -37,7 +37,8 @@ let rec string_of_int_term t =
     | Int i -> string_of_int i
     | Var v -> Variable.var_name v
     | Times (i, t) -> Printf.sprintf "%d * (%s)" i (aux t)
-    | Sum (t1, t2) -> Printf.sprintf "(%s + %s)" (aux t1) (aux t2)
+    | Sub (t1, t2) -> Printf.sprintf "(%s - %s)" (aux t1) (aux t2)
+    | Add (t1, t2) -> Printf.sprintf "(%s + %s)" (aux t1) (aux t2)
     | PSub (p1, p2) -> Printf.sprintf "(%s - %s)" (string_of_pointer_term p1) (string_of_pointer_term p2)
     | Offset p -> Printf.sprintf "Offset(%s)" (string_of_pointer_term p)
   in
@@ -78,7 +79,8 @@ let rec int_term_to_syntaxterm srk t =
   | Int i -> Syntax.mk_int srk i
   | Var v -> Variable.var_to_svar v
   | Times (i, t) -> Syntax.mk_mul srk [(Syntax.mk_int srk i); (int_term_to_syntaxterm srk t)]
-  | Sum (t1, t2) -> Syntax.mk_add srk [(int_term_to_syntaxterm srk t1); (int_term_to_syntaxterm srk t2)]
+  | Add (t1, t2) -> Syntax.mk_add srk [(int_term_to_syntaxterm srk t1); (int_term_to_syntaxterm srk t2)]
+  | Sub (t1, t2) -> Syntax.mk_sub srk (int_term_to_syntaxterm srk t1) (int_term_to_syntaxterm srk t2)
   | PSub (p1, p2) -> Syntax.mk_sub srk (pointer_term_to_offsetsyntaxterm srk p1) (pointer_term_to_offsetsyntaxterm srk p2)
   | Offset p -> pointer_term_to_offsetsyntaxterm srk p
 and pointer_term_to_offsetsyntaxterm srk p =
@@ -164,7 +166,8 @@ let all_pvars f : pvar list =
     | Int _ -> acc
     | Var _ -> acc
     | Times (_, t) -> go_term t acc
-    | Sum (t1, t2) -> go_term t1 (go_term t2 acc)
+    | Add (t1, t2) -> go_term t1 (go_term t2 acc)
+    | Sub (t1, t2) -> go_term t1 (go_term t2 acc)
     | PSub (p1, p2) -> go_pointer_term p1 (go_pointer_term p2 acc)
     | Offset p -> go_pointer_term p acc
   and go_pointer_term p acc =
@@ -190,10 +193,14 @@ let quantify_out_var (f, h : symbolicheap) (v : var) : symbolicheap =
     | Times (i, t) -> 
       let t', b = quantify_out_int_term t v_name in 
       Times (i, t'), b
-    | Sum (t1, t2) ->
+    | Add (t1, t2) ->
       let t1', b1 = quantify_out_int_term t1 v_name in 
       let t2', b2 = quantify_out_int_term t2 v_name in 
-      Sum (t1', t2'), b1 || b2
+      Add (t1', t2'), b1 || b2
+    | Sub (t1, t2) -> 
+      let t1', b1 = quantify_out_int_term t1 v_name in
+      let t2', b2 = quantify_out_int_term t2 v_name in
+      Sub (t1', t2'), b1 || b2
     | PSub (p1, p2) -> 
       let p1', b1 = quantify_out_pointer_term p1 v_name in 
       let p2', b2 = quantify_out_pointer_term p2 v_name in 
@@ -247,10 +254,14 @@ let quantify_out_pvar (f, h : symbolicheap) (p : pvar) : symbolicheap =
     | Times (i, t) -> 
       let t', b = quantify_out_int_term t p_name in 
       Times (i, t'), b
-    | Sum (t1, t2) ->
+    | Add (t1, t2) ->
       let t1', b1 = quantify_out_int_term t1 p_name in 
       let t2', b2 = quantify_out_int_term t2 p_name in 
-      Sum (t1', t2'), b1 || b2
+      Add (t1', t2'), b1 || b2
+    | Sub (t1, t2) ->
+      let t1', b1 = quantify_out_int_term t1 p_name in
+      let t2', b2 = quantify_out_int_term t2 p_name in
+      Sub (t1', t2'), b1 || b2
     | PSub (p1, p2) -> 
       let p1', b1 = quantify_out_pointer_term p1 p_name in 
       let p2', b2 = quantify_out_pointer_term p2 p_name in 
@@ -305,3 +316,6 @@ let quantify_out_pvar (f, h : symbolicheap) (p : pvar) : symbolicheap =
     if b then go (prime_pvar p_name) f' else quantify_out_formula f' p_name
   in 
   (fst (go p f)), h
+
+let pt_eq (p1 : pointer_term) (p2 : pointer_term) : formula =
+  And (Eq (Offset p1, Offset p2), BlockEq (Block p1, Block p2))

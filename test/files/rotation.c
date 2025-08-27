@@ -7,7 +7,7 @@ void f(int count) {
         count --;
         next = malloc (2 * sizeof(int));
         next[0] = 2;
-        // free(curr);
+        free(curr);
         curr = next;
     }
     curr[0] = 1;

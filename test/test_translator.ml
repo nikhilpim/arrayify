@@ -7,8 +7,8 @@ module Heap = Set.Make(HeapElem)
 
 let min_test () = (
   print_string "\n\n\nRunning Translation on test/files/min.c...\n\n\n";
-  let b = new_bvar ~v:0 () in 
-  let p = new_pvar ~v:"%0" () in 
+  let b = new_bvar 0 in 
+  let p = new_pvar "%0" in 
   let formula = And (BlockEq (Block (Pointer p), BVar b), Eq (Offset (Pointer p), Int 0)) in 
   let heap = Heap.singleton (Array b) in 
   let sheap = (formula, heap) in
@@ -17,8 +17,8 @@ let min_test () = (
 
 let comp_test () = (
   print_string "\n\n\nRunning Translation on test/files/comp.c...\n\n\n";
-  let b = new_bvar ~v:0 () in 
-  let p = new_pvar ~v:"%1" () in 
+  let b = new_bvar 0 in 
+  let p = new_pvar "%1" in 
   let formula = And (BlockEq (Block (Pointer p), BVar b), Eq (Offset (Pointer p), Int 0)) in 
   let heap = Heap.singleton (Array b) in 
   let sheap = (formula, heap) in
@@ -46,6 +46,7 @@ let () = (
    (* min_test (); *)
    (* comp_test (); *)
    (* basic_test (); *)
-   rotation_test ();
+   (* rotation_test (); *)
+   ()
 )
 

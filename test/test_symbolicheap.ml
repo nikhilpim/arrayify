@@ -6,25 +6,25 @@ module Heap = Set.Make(HeapElem)
 
 
 let equality_test () = (
-  let b = new_bvar ~v:0 () in
-  let p = new_pvar ~v:"p" () in
-  let x = new_var ~v:"x" () in
+  let b = new_bvar 0 in
+  let p = new_pvar "p" in
+  let x = new_var "x" in
   let formula = And ((Eq (Var x, Int 2), And (BlockEq (Block (Pointer p), BVar b), Eq (Offset (Pointer p), Int 7)))) in
   let heap = Heap.singleton (Array b) in
   let sheap = formula, heap in 
 
-  let formula' = And (Eq ((Var x), (Sum (Int 1, Int 1))), And (BlockEq ((Block (Pointer p), BVar b)), Eq (Offset (Pointer p), (Sum ((Int 3), (Int 4)))))) in
+  let formula' = And (Eq ((Var x), (Add (Int 1, Int 1))), And (BlockEq ((Block (Pointer p), BVar b)), Eq (Offset (Pointer p), (Add ((Int 3), (Int 4)))))) in
   let sheap' = formula', heap in 
 
   assert (sheap_equals sheap sheap')
 )
 
 let implication_test () = (
-  let b0 = new_bvar ~v:0 () in
-  let b1 = new_bvar ~v:1 () in
-  let b2 = new_bvar ~v:2 () in
-  let p1 = new_pvar ~v:"p1" () in
-  let p2 = new_pvar ~v:"p2" () in
+  let b0 = new_bvar 0 in
+  let b1 = new_bvar 1 in
+  let b2 = new_bvar 2 in
+  let p1 = new_pvar "p1" in
+  let p2 = new_pvar "p2" in
 
   let formula = And (BlockEq (Block (Pointer p1), BVar b0), Or (BlockEq (Block (Pointer p2), (BVar b1)), BlockEq ((BVar b2), (Block (Pointer p2))))) in 
   let heap = Heap.singleton (Array b0) in

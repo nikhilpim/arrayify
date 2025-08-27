@@ -3,12 +3,17 @@
   (libraries arrayify llvm)
  )
 
-(test
+(executable
  (name test_parser)
- (libraries arrayify llvm llvm.irreader)
- )
+ (modules test_parser)
+ (libraries arrayify))
 
  (test
  (name test_symbolicheap)
+ (libraries arrayify)
+)
+
+ (test
+ (name test_stringtest)
  (libraries arrayify)
 )

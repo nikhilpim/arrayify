@@ -103,10 +103,10 @@ let generate_llvm_graph_from_ir m =
     let header = String.sub param_str 0 4 in
     let name = String.sub param_str 4 (String.length param_str - 4) in
     if (header = "ptr ") then 
-      let pvar = new_pvar ~v:name () in
+      let pvar = new_pvar name in
       (Pointer pvar) :: acc
     else if (header = "i32 ") then 
-      let var = new_var ~v:name () in 
+      let var = new_var name in 
       (Variable var) :: acc 
     else 
       raise (Failure "Unknown parameter type")

@@ -4,7 +4,7 @@ open Boogieir
 open Llvm
 open Variable
 module LlvmGraph = Graph.Persistent.Digraph.Concrete(LlvmNode)
-module BGraph = Graph.Persistent.Digraph.ConcreteLabeled(BGNode)(BGEdge)
+module BGraph = Boogieir.BGraph
 
 module LLvmNodeSet = Set.Make(LlvmNode)
 module Heap = Set.Make(HeapElem)
@@ -14,24 +14,24 @@ let extract_int_term (v : llvalue) : int_term =
   if ((String.sub s 0 4) = "i32 ") then 
     (
       let value_str = String.sub s 4 (String.length s - 4) in
-      if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
+      if String.get value_str 0 = '%' then Var (new_var value_str) 
         else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
     ) else 
   if ((String.sub s 0 4) = "i64 ") then 
     (
     let value_str = String.sub s 4 (String.length s - 4) in
-    if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
+    if String.get value_str 0 = '%' then Var (new_var value_str) 
       else Int (String.sub s 4 (String.length s - 4) |> int_of_string)
     ) else 
   if ((String.sub s 0 3) = "i8 ") then 
     (
     let value_str = String.sub s 3 (String.length s - 3) in
-    if String.get value_str 0 = '%' then Var (new_var ~v:value_str ()) 
+    if String.get value_str 0 = '%' then Var (new_var value_str) 
       else Int (String.sub s 3 (String.length s - 3) |> int_of_string)
     ) else
   if (String.get s 0 = '%') then (
       let var_name = s |> String.trim |> String.split_on_char ' ' |> List.hd in
-      let var = new_var ~v:var_name () in
+      let var = new_var var_name in
       Var var
   ) else 
     raise (Failure "unimplemented int term extraction")
@@ -40,10 +40,10 @@ let extract_pointer (v : llvalue) : pvar =
   let s = string_of_llvalue v |> String.trim in 
   if ((String.sub s 0 4) = "ptr ") then 
     (
-      new_pvar ~v:(String.sub s 4 (String.length s - 4)) ()
+      new_pvar (String.sub s 4 (String.length s - 4)) 
     ) else if (String.get s 0 = '%') then 
       (let pvar_name = s |> String.trim |> String.split_on_char ' ' |> List.hd in
-      new_pvar ~v:pvar_name ()) 
+      new_pvar pvar_name) 
   else (raise (Failure "unimplemented pointer extraction"))
 
 let extract_target (v : llvalue) : string = 
@@ -74,10 +74,10 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.Unreachable -> raise (Failure "Not implemented")
     | 	Opcode.Add  -> (
       let tgt = extract_target instr in
-      let tgt_var = new_var ~v:tgt () in  
+      let tgt_var = new_var tgt in  
       let left = operand instr 0 |> extract_int_term in
       let right = operand instr 1 |> extract_int_term in
-      let term = Symbolicheap.Sum (left, right) in
+      let term = Symbolicheap.Add (left, right) in
       let boogie_instrs = [
         Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term term);
       ]  in
@@ -89,7 +89,17 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     Standard Binary Operators
       *)
     | 	Opcode.FAdd -> raise (Failure "Not implemented")
-    | 	Opcode.Sub -> raise (Failure "Not implemented")
+    | 	Opcode.Sub -> (
+      let p0 = operand instr 0 |> extract_int_term in
+      let p1 = operand instr 1 |> extract_int_term in
+      let tgt = extract_target instr in
+      let tgt_var = new_var tgt in
+      let f, h = (quantify_out_var cond tgt_var) in
+      let postcond = Symbolicheap.And ((Symbolicheap.Eq ((Var tgt_var),(Symbolicheap.Sub (p0, p1) ))), f), h in 
+      let boogie_instrs = [
+        Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term (Symbolicheap.Sub (p0, p1)));
+      ] in
+      postcond, boogie_instrs)
     | 	Opcode.FSub -> raise (Failure "Not implemented")
     | 	Opcode.Mul -> raise (Failure "Not implemented")
     | 	Opcode.FMul -> raise (Failure "Not implemented")
@@ -113,12 +123,12 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.Load -> (
       let pointer = operand instr 0 |> extract_pointer in
       let tgt = extract_target instr in
-      let tgt_var = new_var ~v:tgt () in
+      let tgt_var = new_var tgt in
       match sheap_single_b cond pointer with 
       | Some b -> (
         let boogie_instrs = [
                         Assert (Leq (Int 0, Var (boogie_var_of_pvar pointer))); 
-                        Assert (Leq (Var (boogie_var_of_pvar pointer), Var (boogie_length_of_boogie_avar (boogie_avar_of_bvar b)))); 
+                        Assert (Not (Leq (Var (boogie_length_of_boogie_avar (boogie_avar_of_bvar b)), Var (boogie_var_of_pvar pointer)))); 
                         Assign ((boogie_var_of_var tgt_var), (Read ((boogie_avar_of_bvar b),(Var (boogie_var_of_pvar pointer)))))
                       ] in 
                         cond, boogie_instrs
@@ -146,14 +156,24 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
       let pointer = operand instr 0 |> extract_pointer in
       let offset = operand instr 1 |> extract_int_term in
       let tgt = extract_target instr in
-      let tgt_var = new_pvar ~v:tgt () in
+      let tgt_var = new_pvar tgt in
       let boogie_instrs = [
-        Assign (boogie_var_of_pvar tgt_var, boogie_term_of_int_term offset);
+        Assign (boogie_var_of_pvar tgt_var, Sum (boogie_term_of_pointer_term (Pointer pointer), boogie_term_of_int_term offset));
       ] in
       let f, h = (quantify_out_pvar cond tgt_var) in
-      let postcond = Symbolicheap.And ((BlockEq ((Block (Pointer pointer)) , (Block (Pointer tgt_var)))) , And (Eq (Offset (Pointer tgt_var), offset), f)), h in
+      let postcond = Symbolicheap.And ((pt_eq (Pointer tgt_var) (PointerSum (Pointer pointer, offset))), f), h in 
       postcond, boogie_instrs)
-    | 	Opcode.Trunc -> raise (Failure "Not implemented") 	(*	
+    | 	Opcode.Trunc -> (
+      let v = operand instr 0 |> extract_int_term in
+      let tgt = extract_target instr in
+      let tgt_var = new_var tgt in
+      let boogie_instrs = [
+        Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term v);
+      ] in
+      let f, h = (quantify_out_var cond tgt_var) in
+      let postcond = Symbolicheap.And (Eq (Var tgt_var, v), f), h in
+      postcond, boogie_instrs
+    ) 	(*	
     Cast Operators
       *)
     | 	Opcode.ZExt -> raise (Failure "Not implemented")
@@ -164,7 +184,16 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
     | 	Opcode.SIToFP -> raise (Failure "Not implemented")
     | 	Opcode.FPTrunc -> raise (Failure "Not implemented")
     | 	Opcode.FPExt -> raise (Failure "Not implemented")
-    | 	Opcode.PtrToInt -> raise (Failure "Not implemented")
+    | 	Opcode.PtrToInt -> (
+      let pointer = operand instr 0 |> extract_pointer in
+      let tgt = extract_target instr in
+      let tgt_var = new_var tgt in
+      let boogie_instrs = [
+        Assign (boogie_var_of_var tgt_var, boogie_term_of_pointer_term (Pointer pointer));
+      ] in
+      let f, h = (quantify_out_var cond tgt_var) in
+      let postcond = Symbolicheap.And ((Symbolicheap.Eq ((Offset (Pointer pointer)), (Var tgt_var))), f), h in 
+      postcond, boogie_instrs)
     | 	Opcode.IntToPtr -> raise (Failure "Not implemented")
     | 	Opcode.BitCast -> raise (Failure "Not implemented")
     | 	Opcode.ICmp  -> (
@@ -172,7 +201,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
       let rhs = operand instr 1 |> extract_int_term in
       (* This is a hacky way of extracting the variable that a operation assigns to. *)
       let cmp_flag_name = string_of_llvalue instr |> String.trim |> String.split_on_char ' ' |> List.hd in 
-      let cmp_flag = new_var ~v:cmp_flag_name () in 
+      let cmp_flag = new_var cmp_flag_name in 
       let op, bop = match icmp_predicate instr with 
         | Some Llvm.Icmp.Eq -> Symbolicheap.Eq (lhs, rhs), Eq (boogie_term_of_int_term lhs, boogie_term_of_int_term rhs)
         | Some Llvm.Icmp.Ne -> Not (Eq (lhs, rhs)), Not (Eq (boogie_term_of_int_term lhs, boogie_term_of_int_term rhs))
@@ -201,7 +230,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         if type_defn = "i32" then (
         let term = operand instr (phi_num - 1) |> extract_int_term in 
         let tgt = extract_target instr in
-        let tgt_var = new_var ~v:tgt () in
+        let tgt_var = new_var tgt in
         let boogie_instrs = [
           Assign (boogie_var_of_var tgt_var, boogie_term_of_int_term term);
         ]  in 
@@ -211,7 +240,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         else if type_defn = "ptr" then (
           let ptr = operand instr (phi_num - 1) |> extract_pointer in 
           let tgt = extract_target instr in 
-          let tgt_ptr = new_pvar ~v:tgt () in 
+          let tgt_ptr = new_pvar tgt in 
           let boogie_instrs = [
             Assign (boogie_var_of_pvar tgt_ptr, boogie_term_of_pointer_term (Pointer ptr))
           ] in 
@@ -228,7 +257,7 @@ let symbolic_update_instr (instr : llvalue) (cond : symbolicheap) (phi_num : int
         let size = operand instr 0 |> extract_int_term in 
         let new_bvar = Boogieir.generate_new_bvar bgraph in 
         let tgt = extract_target instr in
-        let tgt_var = new_pvar ~v:tgt () in
+        let tgt_var = new_pvar tgt in
         let boogie_instrs = [
           AAssign (boogie_avar_of_bvar new_bvar, boogie_avar_of_bvar new_bvar);
           Assign (boogie_length_of_boogie_avar (boogie_avar_of_bvar new_bvar), boogie_term_of_int_term size);
@@ -310,7 +339,7 @@ let gen_boogie_edge (from : BGNode.t) (towards : BGNode.t) (rotation : boogie_in
     | Some (`Conditional (_, taken_block, not_taken_block)) -> (
       let cmp_flag_name = (string_of_llvalue terminator |> String.trim |> String.split_on_char ' ' |> List.nth) 2 in 
             let cmp_flag_name = String.sub cmp_flag_name 0 (String.length cmp_flag_name - 1) in
-            let cmp_flag = new_var ~v:cmp_flag_name () in
+            let cmp_flag = new_var cmp_flag_name in
             let branch_condition = if (Llvmutil.block_eq (LlvmNode.llvm_block towards_node) (taken_block)) then ((Eq (Var (boogie_var_of_var cmp_flag), Int 1))) 
             else (if (Llvmutil.block_eq (LlvmNode.llvm_block towards_node) not_taken_block) then ((Eq (Var (boogie_var_of_var cmp_flag), Int 0))) 
             else (raise (Failure "towards not in branch statement"))) in 
@@ -330,7 +359,7 @@ let gen_branch_condition (from : LlvmNode.t) (towards : LlvmNode.t) : formula =
     | Some (`Conditional (_, taken_block, not_taken_block)) -> (
       let cmp_flag_name = (string_of_llvalue terminator |> String.trim |> String.split_on_char ' ' |> List.nth) 2 in 
       let cmp_flag_name = String.sub cmp_flag_name 0 (String.length cmp_flag_name - 1) in
-      let cmp_flag = new_var ~v:cmp_flag_name () in
+      let cmp_flag = new_var cmp_flag_name in
       let branch_condition = if (Llvmutil.block_eq (LlvmNode.llvm_block towards) (taken_block)) then ((Symbolicheap.Eq (Var cmp_flag, Int 1))) 
       else (if (Llvmutil.block_eq (LlvmNode.llvm_block towards) not_taken_block) then ((Eq (Var cmp_flag, Int 0))) 
       else (raise (Failure "towards not in branch statement"))) in 

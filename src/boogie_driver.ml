@@ -1,4 +1,4 @@
-let parse (filename : string) : Boogieir.BGraph.t =
+let parse (filename : string) : Boogie_ast.program =
   let chan = open_in filename in
   let lexbuf = Lexing.from_channel chan in
   try

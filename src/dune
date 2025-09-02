@@ -1,7 +1,7 @@
 (library 
  (public_name arrayify)
  (name arrayify)
-  (modules executor translator llvmutil global symbolicheap variable boogieir boogie_parser boogie_lexer boogie_driver)
+  (modules executor translator llvmutil global symbolicheap variable boogieir boogie_parser boogie_lexer boogie_driver boogie_ast)
  (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (libraries srkmin core llvm llvm.irreader ocamlgraph batteries zarith ppx_deriving ppx_deriving.show ppx_deriving.ord ppx_deriving.eq z3 memo menhirLib)
  )

@@ -18,7 +18,7 @@ let var_name (v : var) : string = "v_"^v
 let pvar_name (p : pvar) : string = "p_"^p
 let bvar_name (b : bvar) : string = "b_"^string_of_int b
 
-let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'v' else c) b
+let boogie_var_name (b : boogie_var) : string = String.map (fun c -> if c = '%' then 'v' else (if c = '.' then '_' else c)) b
 let boogie_avar_name (a : boogie_avar) : string = a
 let boogie_avar_input_name (a : boogie_avar) : string = (boogie_avar_name a)^"_input"
 let boogie_avar_local_name (b : boogie_avar) : string = (boogie_avar_name b)^"_local"
